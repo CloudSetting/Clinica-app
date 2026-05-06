@@ -2,8 +2,8 @@ import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-const resend = new Resend(process.env.RESEND_API_KEY || 're_123');
-
+// Busca esta línea y modifícala para que tenga un valor por defecto
+const resend = new Resend(process.env.RESEND_API_KEY || 're_123456789');
 // Configuración de Supabase (usando Service Role para saltar RLS si es necesario)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
