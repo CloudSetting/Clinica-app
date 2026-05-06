@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function POST(req: NextRequest) {
   try {
-    const { nombre, apellido, email, telefono, especialidad, fecha, hora, motivo, recaptchaToken } =
+    const { nombre,  email, telefono,  fecha, hora, motivo, recaptchaToken } =
       await req.json();
 
     // Verificar reCAPTCHA
@@ -31,17 +26,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Guardar en Supabase
-    const { error } = await supabase.from("reservas").insert([
+    const { error } = await supabaseAdmin.from("reservas").insert([
       {
-        nombre,
-        apellido,
-        email,
-        telefono,
-        especialidad,
+        paciente_nombre: nombre,
+        paciente_email: email,
+        paciente_telefono: telefono,
         fecha,
-        hora,
-        motivo,
+        hora_inicio: hora,
+        hora_fin: hora,
         estado: "pendiente",
+        notas: motivo,
       },
     ]);
 
