@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import Link from 'next/link'; // 1. Importamos Link
 
 export default function Hero() {
   return (
@@ -36,9 +37,14 @@ export default function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.4, ease: 'easeOut' }}
         >
-          <a href="#reservas" className="bg-primary hover:bg-primary-dark text-white font-semibold px-8 py-4 rounded-full text-lg transition-colors duration-200">
+          {/* 2. Cambiamos 'a' por 'Link' y el href a la ruta de tu carpeta '/reservas' */}
+          <Link 
+            href="/reservas" 
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-full text-lg transition-colors duration-200 text-center"
+          >
             Agendar hora
-          </a>
+          </Link>
+
           <a href="#servicios" className="border-2 border-white text-white hover:bg-white hover:text-primary-dark font-semibold px-8 py-4 rounded-full text-lg transition-colors duration-200">
             Conocer nuestros servicios
           </a>
