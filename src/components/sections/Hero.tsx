@@ -43,7 +43,7 @@ export default function Hero() {
         >
           {/* BOTÓN PRINCIPAL: Redirige a la página de reservas dentro de admin */}
           <Link 
-            href="/admin/reservas" 
+            href="/reservas" 
             className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-full text-lg transition-colors duration-200 text-center shadow-lg"
           >
             Agendar hora
