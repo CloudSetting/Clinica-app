@@ -3,9 +3,7 @@ import {
   LayoutDashboard, 
   Users, 
   Calendar, 
-  Clock, 
-  Settings,
-  LogOut 
+  Clock
 } from "lucide-react";
 import LogoutButton from "@/components/LogoutButton"; // Crearemos este pequeño componente abajo
 
