@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import Link from 'next/link'; // 1. Importamos Link
+import Link from 'next/link';
 
 export default function Hero() {
   return (
@@ -9,10 +9,12 @@ export default function Hero() {
       className="relative min-h-screen flex items-center justify-center bg-cover bg-center"
       style={{ backgroundImage: "url('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=1920&q=80')" }}
     >
-      <div className="absolute inset-0 bg-primary-dark opacity-75" />
+      {/* Overlay azul oscuro para legibilidad */}
+      <div className="absolute inset-0 bg-blue-900 opacity-75" />
 
       <div className="relative z-10 text-center text-white px-4 max-w-4xl mx-auto">
 
+        {/* Título con animación */}
         <motion.h1
           className="text-4xl md:text-6xl font-bold mb-6 leading-tight"
           initial={{ opacity: 0, y: 40 }}
@@ -22,6 +24,7 @@ export default function Hero() {
           Centro de Salud <span className="text-blue-300">Integral</span>
         </motion.h1>
 
+        {/* Subtítulo con animación */}
         <motion.p
           className="text-lg md:text-2xl mb-10 text-gray-200 max-w-2xl mx-auto"
           initial={{ opacity: 0, y: 40 }}
@@ -31,27 +34,33 @@ export default function Hero() {
           Atención médica y psicológica de calidad. ¡Agenda tu hora ahora!
         </motion.p>
 
+        {/* Contenedor de Botones */}
         <motion.div
           className="flex flex-col sm:flex-row gap-4 justify-center"
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.4, ease: 'easeOut' }}
         >
-          {/* 2. Cambiamos 'a' por 'Link' y el href a la ruta de tu carpeta '/reservas' */}
+          {/* BOTÓN PRINCIPAL: Redirige a la página de reservas dentro de admin */}
           <Link 
-            href="/reservas" 
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-full text-lg transition-colors duration-200 text-center"
+            href="/admin/reservas" 
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-full text-lg transition-colors duration-200 text-center shadow-lg"
           >
             Agendar hora
           </Link>
 
-          <a href="#servicios" className="border-2 border-white text-white hover:bg-white hover:text-primary-dark font-semibold px-8 py-4 rounded-full text-lg transition-colors duration-200">
+          {/* BOTÓN SECUNDARIO: Scroll a la sección de servicios en la misma página */}
+          <a 
+            href="#servicios" 
+            className="border-2 border-white text-white hover:bg-white hover:text-blue-900 font-semibold px-8 py-4 rounded-full text-lg transition-colors duration-200 text-center"
+          >
             Conocer nuestros servicios
           </a>
         </motion.div>
 
       </div>
 
+      {/* Icono de flecha hacia abajo animado */}
       <motion.div
         className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white text-4xl"
         animate={{ y: [0, 10, 0] }}
