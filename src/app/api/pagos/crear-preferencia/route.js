@@ -6,14 +6,12 @@ const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN 
 });
 
-export async function POST(request) {
+export async function POST(request) { // 👈 Eliminado el ': Request'
   try {
     const { servicio, precio, reservaData } = await request.json();
 
-    // 2. Definimos la URL base de tu túnel activo
-    // Usamos la de Cloudflare que generaste para que Mercado Pago pueda acceder
-// Cambia esta línea con la URL que te dio el último comando de untun
-const baseUrl = "https://sea-explicit-combat-joined.trycloudflare.com";
+    // 2. Definimos la URL base de tu túnel activo (Cloudflare de untun)
+    const baseUrl = "https://sea-explicit-combat-joined.trycloudflare.com";
     const preference = new Preference(client);
 
     // 3. Creación de la preferencia
@@ -38,22 +36,20 @@ const baseUrl = "https://sea-explicit-combat-joined.trycloudflare.com";
           hora: reservaData.hora,
         },
         back_urls: {
-          success: `${baseUrl}/test`, // Cambia /test por tu página de éxito final luego
-          failure: `${baseUrl}/test`,
-          pending: `${baseUrl}/test`,
+          success: `${baseUrl}/reservas/exito`,
+          failure: `${baseUrl}/reservas`,
+          pending: `${baseUrl}/reservas`,
         },
         auto_return: 'approved',
-        // El Webhook: Mercado Pago enviará un POST a esta dirección al confirmar el pago
         notification_url: `${baseUrl}/api/pagos/webhook`,
       }
     });
 
     console.log("✅ Preferencia creada con éxito. ID:", result.id);
 
-    // Devolvemos el init_point para que el frontend redirija al usuario
     return NextResponse.json({ init_point: result.init_point });
 
-  } catch (error) {
+  } catch (error) { // 👈 Eliminado el ': any'
     console.error("❌ Error detallado en Mercado Pago:", error);
     
     return NextResponse.json({ 
