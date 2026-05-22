@@ -1,87 +1,77 @@
-'use client';
+"use client";
 
-export const dynamic = 'force-dynamic';
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 
-import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { Suspense } from 'react';
-import { CheckCircle2, ArrowRight, XCircle, Loader2 } from 'lucide-react';
-
-function ContenidoPagoExitoso() {
+// Componente interno que maneja la lectura limpia de parámetros
+function ContenidoExito() {
   const searchParams = useSearchParams();
+  const status = searchParams.get("status");
+  const paymentId = searchParams.get("payment_id");
 
-  const paymentId = searchParams.get('payment_id');
-  const statusPago = searchParams.get('status');
+  // Si no hay status en la URL (por ejemplo, entraron escribiendo la ruta a mano), asumimos error/invalidez
+  const esAprobado = status === "approved";
 
-  const esExitoso = statusPago === 'approved';
-
-  if (!esExitoso) {
+  if (esAprobado) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center space-y-6">
-          <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto">
-            <XCircle size={48} />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-black text-gray-900">Hubo un problema</h1>
-            <p className="text-gray-500 text-sm">
-              No pudimos confirmar tu pago. Si se realizó el cobro, por favor comunícate con soporte.
-            </p>
-          </div>
-          <div className="pt-4">
-            <Link 
-              href="/admin/reservas" 
-              className="w-full py-4 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg"
-            >
-              Intentar nuevamente
-            </Link>
-          </div>
+      <div className="text-center py-10 max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+        <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle2 size={40} />
         </div>
-      </main>
+        <h3 className="text-2xl font-black text-gray-900">¡Pago Confirmado!</h3>
+        <p className="text-gray-500 text-sm mt-2">
+          Tu cita ha sido agendada con éxito. Te esperamos en nuestro centro médico.
+        </p>
+        {paymentId && (
+          <p className="text-[11px] bg-gray-100 text-gray-500 font-mono py-1 px-3 rounded-lg mt-4 inline-block">
+            ID Transacción: {paymentId}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => window.location.href = "/reservas"}
+          className="mt-6 w-full py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-colors"
+        >
+          Agendar otra cita
+        </button>
+      </div>
     );
   }
 
+  // Render para estados fallidos, pendientes o nulos
   return (
-    <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center space-y-6">
-        <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto">
-          <CheckCircle2 size={48} />
-        </div>
-        <div className="space-y-2">
-          <h1 className="text-3xl font-black text-gray-900">¡Cita Confirmada!</h1>
-          <p className="text-gray-500 text-sm">
-            Tu pago ha sido procesado con éxito. Te esperamos en nuestro centro médico.
-          </p>
-        </div>
-        <div className="bg-gray-50 rounded-2xl p-4 text-left text-xs text-gray-400 space-y-1">
-          <p><span className="font-bold text-gray-500">ID de Pago:</span> {paymentId}</p>
-          <p><span className="font-bold text-gray-500">Estado:</span> Pago Aprobado</p>
-        </div>
-        <div className="pt-4">
-          <Link 
-            href="/" 
-            className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg"
-          >
-            Volver al Inicio
-            <ArrowRight size={18} />
-          </Link>
-        </div>
+    <div className="text-center py-10 max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+      <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+        <XCircle size={40} />
       </div>
-    </main>
+      <h3 className="text-2xl font-black text-gray-900">Hubo un problema</h3>
+      <p className="text-gray-500 text-sm mt-2">
+        No pudimos confirmar tu pago de manera automática. Si se realizó el cobro en tu cuenta, por favor comunícate con soporte técnico.
+      </p>
+      <button
+        type="button"
+        onClick={() => window.location.href = "/reservas"}
+        className="mt-6 w-full py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors"
+      >
+        Intentar nuevamente
+      </button>
+    </div>
   );
 }
 
-export default function PagoExitosoPage() {
+// Componente principal contenedor con Suspense
+export default function PaginaExito() {
   return (
-    <Suspense 
-      fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-          <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
-          <p className="text-gray-600 font-medium">Cargando detalles de tu reserva...</p>
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
+      <Suspense fallback={
+        <div className="text-center">
+          <Loader2 className="animate-spin text-blue-600 mx-auto" size={40} />
+          <p className="mt-2 text-gray-500 text-sm">Cargando detalles del pago...</p>
         </div>
-      }
-    >
-      <ContenidoPagoExitoso />
-    </Suspense>
+      }>
+        <ContenidoExito />
+      </Suspense>
+    </main>
   );
 }
