@@ -2,13 +2,11 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from "lucide-react";
 
 const MAX_INTENTOS = 5;
 
 export default function AdminLogin() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mostrarPassword, setMostrarPassword] = useState(false);
@@ -17,7 +15,7 @@ export default function AdminLogin() {
   const [intentos, setIntentos] = useState(0);
   const [bloqueado, setBloqueado] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (bloqueado) return;
@@ -25,32 +23,39 @@ export default function AdminLogin() {
     setCargando(true);
     setError("");
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      const nuevosIntentos = intentos + 1;
-      setIntentos(nuevosIntentos);
+      if (result?.error) {
+        const nuevosIntentos = intentos + 1;
+        setIntentos(nuevosIntentos);
 
-      if (nuevosIntentos >= MAX_INTENTOS) {
-        setBloqueado(true);
-        setError("Demasiados intentos fallidos. Cuenta bloqueada temporalmente.");
+        if (nuevosIntentos >= MAX_INTENTOS) {
+          setBloqueado(true);
+          setError("Demasiados intentos fallidos. Cuenta bloqueada temporalmente.");
+        } else {
+          setError(
+            `Email o contraseña incorrectos. Intentos restantes: ${MAX_INTENTOS - nuevosIntentos}`
+          );
+        }
+        setCargando(false);
       } else {
-        setError(
-          `Email o contraseña incorrectos. Intentos restantes: ${MAX_INTENTOS - nuevosIntentos}`
-        );
+        // Redirección nativa por ventana para evitar congelamientos asincrónicos en producción
+        window.location.href = "/admin/dashboard";
       }
+    } catch (err) {
+      console.error("Error crítico en la autenticación:", err);
+      setError("Ocurrió un problema de comunicación con el servidor.");
       setCargando(false);
-    } else {
-      router.push("/admin/dashboard");
     }
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-950 to-blue-900 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-950 to-blue-900 flex items-center justify-center px-4">
       <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md">
 
         {/* Logo */}
@@ -86,6 +91,7 @@ export default function AdminLogin() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@clinica.cl"
                 required
+                autoComplete="email"
                 disabled={bloqueado}
                 className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:bg-gray-100"
               />
@@ -108,6 +114,7 @@ export default function AdminLogin() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
                 disabled={bloqueado}
                 className="w-full border border-gray-200 rounded-xl pl-10 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:bg-gray-100"
               />
