@@ -1,11 +1,12 @@
 'use client';
 
+export const dynamic = 'force-dynamic'; // 👈 ESTO OBLIGA A NEXT.JS A EVITAR EL PRERENDER
+
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Suspense } from 'react'; // 1. Importamos Suspense
+import { Suspense } from 'react';
 import { CheckCircle2, ArrowRight, XCircle, Loader2 } from 'lucide-react';
 
-// 2. Movemos la lógica interna a un componente secundario controlado
 function ContenidoPagoExitoso() {
   const searchParams = useSearchParams();
 
@@ -77,7 +78,6 @@ function ContenidoPagoExitoso() {
   );
 }
 
-// 3. El componente principal (export default) ahora envuelve todo en <Suspense>
 export default function PagoExitosoPage() {
   return (
     <Suspense 
