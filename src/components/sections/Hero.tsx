@@ -42,12 +42,12 @@ export default function Hero() {
           transition={{ duration: 0.7, delay: 0.4, ease: 'easeOut' }}
         >
           {/* BOTÓN PRINCIPAL: Redirige a la página de reservas dentro de admin */}
-          <Link 
-            href="/reservas" 
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-full text-lg transition-colors duration-200 text-center shadow-lg"
-          >
-            Agendar hora
-          </Link>
+         <Link 
+  href="/reservas" 
+  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-full text-lg transition-colors duration-200 text-center shadow-lg"
+>
+  Agendar hora
+</Link>
 
           {/* BOTÓN SECUNDARIO: Scroll a la sección de servicios en la misma página */}
           <a 
