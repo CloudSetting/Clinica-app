@@ -28,6 +28,7 @@ const authOptions = {
 
         if (!credentials?.email || !credentials?.password) return null;
 
+        // Buscar el administrador en la base de datos de Supabase
         const { data: admin, error } = await supabaseAdmin
           .from("admins")
           .select("id, email, password_hash, nombre, rol, activo")
@@ -48,6 +49,7 @@ const authOptions = {
         const passwordInput = credentials.password as string;
 
         // --- NORMALIZACIÓN DE HASH ---
+        // Previene errores si el hash viene con formatos diferentes como $2y$ en la base de datos
         const hashFormateado = hashEnDB.replace(/^\$2y\$/, "$2a$");
         
         const passwordValida = await bcrypt.compare(passwordInput, hashFormateado);
@@ -84,7 +86,7 @@ const authOptions = {
   session: {
     strategy: "jwt" as const,
   },
-  // 👈 CORRECCIÓN 1: Forzar el uso de cookies encriptadas bajo HTTPS en Vercel
+  // Configuración crucial para que las cookies viajen seguras bajo HTTPS en Vercel
   useSecureCookies: process.env.NODE_ENV === "production",
   cookies: {
     sessionToken: {
@@ -100,6 +102,9 @@ const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-// 👈 CORRECCIÓN 2: Exportación explícita compatible con el App Router de Vercel
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };
+// 1. Inicializamos NextAuth pasándole la configuración
+const authResult = NextAuth(authOptions);
+
+// 2. Exportamos las funciones directamente usando las constantes nativas de la librería.
+// Esto conserva de forma automática el tipo 'NextRequest' interno que exige Next.js 16.
+export const { GET, POST } = authResult.handlers;
