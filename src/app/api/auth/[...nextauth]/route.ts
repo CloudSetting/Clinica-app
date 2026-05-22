@@ -24,10 +24,7 @@ const authOptions = {
         password: { label: "Contraseña", type: "password" },
       },
       async authorize(credentials) {
-        // --- LOG DE INICIO ---
         console.log("🔍 Intentando login para:", credentials?.email);
-
-        
 
         if (!credentials?.email || !credentials?.password) return null;
 
@@ -38,7 +35,7 @@ const authOptions = {
           .single();
 
         if (error || !admin) {
-          console.log("❌ Usuario no encontrado");
+          console.log("❌ Usuario no encontrado o error en query");
           return null;
         }
 
@@ -48,22 +45,10 @@ const authOptions = {
         }
 
         const hashEnDB = admin.password_hash as string;
-       // BUSCA ESTA PARTE Y AÑADE EL LOG:
-const passwordInput = credentials.password as string;
-
-// --- AÑADE ESTO SOLO PARA UNA PRUEBA ---
-const nuevoHash = await bcrypt.hash("Admin123!", 10);
-console.log("------------------------------------------");
-console.log("COPIA ESTE HASH Y PEGALO EN SUPABASE:");
-console.log(nuevoHash);
-console.log("------------------------------------------");
+        const passwordInput = credentials.password as string;
 
         // --- NORMALIZACIÓN DE HASH ---
-        // Algunos generadores usan $2y$, bcryptjs prefiere $2a$. 
-        // Esto previene errores de "Contraseña incorrecta" por formato.
         const hashFormateado = hashEnDB.replace(/^\$2y\$/, "$2a$");
-
-        console.log("DEBUG: Comparando password con hash formateado...");
         
         const passwordValida = await bcrypt.compare(passwordInput, hashFormateado);
 
@@ -99,8 +84,22 @@ console.log("------------------------------------------");
   session: {
     strategy: "jwt" as const,
   },
+  // 👈 CORRECCIÓN 1: Forzar el uso de cookies encriptadas bajo HTTPS en Vercel
+  useSecureCookies: process.env.NODE_ENV === "production",
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === "production" ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax' as const,
+        path: '/',
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-const { handlers } = NextAuth(authOptions);
-export const { GET, POST } = handlers;
+// 👈 CORRECCIÓN 2: Exportación explícita compatible con el App Router de Vercel
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
