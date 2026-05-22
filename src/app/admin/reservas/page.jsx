@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   format, 
@@ -41,6 +41,7 @@ const Paso1Servicio = ({ reserva, setReserva, irSiguiente }) => (
     {["Medicina General", "Psicología Clínica", "Nutrición", "Kinesiología"].map((s) => (
       <button
         key={s}
+        type="button"
         onClick={() => { setReserva({ ...reserva, servicio: s }); irSiguiente(); }}
         className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${
           reserva.servicio === s ? "border-blue-600 bg-blue-50 shadow-sm" : "border-gray-100 hover:border-blue-200 bg-white"
@@ -66,6 +67,7 @@ const Paso2Profesional = ({ profesionales, reserva, setReserva, irSiguiente, car
       {listaAMostrar.map((p) => (
         <button
           key={p.id}
+          type="button"
           onClick={() => { setReserva({ ...reserva, profesional: p }); irSiguiente(); }}
           className={`p-4 rounded-2xl border-2 transition-all flex items-center gap-4 ${
             reserva.profesional?.id === p.id ? "border-blue-600 bg-blue-50" : "border-gray-100 bg-white hover:border-blue-200"
@@ -84,7 +86,6 @@ const Paso2Profesional = ({ profesionales, reserva, setReserva, irSiguiente, car
   );
 };
 
-// --- PASO 3: FECHA Y HORA ---
 // --- PASO 3: CALENDARIO E INTERVALOS ---
 const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
   const [mesActual, setMesActual] = useState(new Date());
@@ -146,6 +147,7 @@ const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
       dias.push(
         <button
           key={cloneDia.toString()}
+          type="button"
           disabled={esPasado || !esMesActual}
           onClick={() => setReserva({ ...reserva, fecha: format(cloneDia, "yyyy-MM-dd"), hora: "" })}
           className={`h-10 w-full flex items-center justify-center rounded-xl text-xs font-bold transition-all
@@ -159,29 +161,26 @@ const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
       );
       dia = addDays(dia, 1);
     }
-    // IMPORTANTE: grid-cols-7 con w-full asegura la distribución horizontal
     return <div className="grid grid-cols-7 gap-1 w-full mt-2">{dias}</div>;
   };
 
   return (
     <div className="flex flex-col w-full space-y-6">
       <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm w-full box-border">
-        {/* Cabecera del mes */}
         <div className="flex items-center justify-between mb-6">
           <h3 className="font-black text-gray-800 capitalize text-lg">
             {format(mesActual, "MMMM yyyy", { locale: es })}
           </h3>
           <div className="flex gap-2">
-            <button onClick={() => setMesActual(subMonths(mesActual, 1))} className="p-2 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+            <button type="button" onClick={() => setMesActual(subMonths(mesActual, 1))} className="p-2 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
               <ChevronLeft size={18}/>
             </button>
-            <button onClick={() => setMesActual(addMonths(mesActual, 1))} className="p-2 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+            <button type="button" onClick={() => setMesActual(addMonths(mesActual, 1))} className="p-2 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
               <ChevronRight size={18}/>
             </button>
           </div>
         </div>
 
-        {/* Días de la semana */}
         <div className="grid grid-cols-7 w-full text-center mb-2">
           {["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"].map(d => (
             <div key={d} className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
@@ -190,7 +189,6 @@ const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
           ))}
         </div>
 
-        {/* Los días del mes */}
         <div className="w-full">
           {renderCalendario()}
         </div>
@@ -209,13 +207,13 @@ const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
                 {cargandoHoras && <Loader2 size={14} className="animate-spin text-blue-600"/>}
              </div>
              
-             {/* Grid de Horas (4 columnas) */}
              <div className="grid grid-cols-4 gap-2 w-full">
                 {horasBase.map(h => {
                   const ocupado = bloquesOcupados.includes(h);
                   return (
                     <button
                       key={h}
+                      type="button"
                       disabled={ocupado}
                       onClick={() => setReserva({...reserva, hora: h})}
                       className={`py-3 rounded-xl border text-[11px] font-bold transition-all w-full
@@ -230,6 +228,7 @@ const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
 
              <div className="mt-6 pb-10">
                <button 
+                 type="button"
                  disabled={!reserva.hora} 
                  onClick={() => irSiguiente()} 
                  className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest transition-all shadow-xl
@@ -258,7 +257,7 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
       paciente_email: reserva.paciente.email,
       servicio: reserva.servicio,
       fecha: reserva.fecha,
-      hora: reserva.hora,
+      hora_inicio: reserva.hora, 
       estado: "confirmada"
     }]);
     if (!error) setExito(true);
@@ -270,14 +269,15 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
     <div className="text-center py-10">
       <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle2 size={40}/></div>
       <h3 className="text-2xl font-black">¡Cita Agendada!</h3>
-      <button onClick={() => window.location.reload()} className="mt-6 font-bold text-blue-600 underline">Agendar otra</button>
+      <p className="text-gray-500 text-sm mt-1">Ingresada de forma manual por el administrador.</p>
+      <button type="button" onClick={() => window.location.reload()} className="mt-6 font-bold text-blue-600 underline block mx-auto">Agendar otra</button>
     </div>
   );
 
   return (
     <div className="space-y-6 pb-12">
       <div className="bg-blue-600 rounded-4xl p-6 text-white shadow-xl shadow-blue-100">
-        <p className="text-[10px] font-black uppercase tracking-widest mb-4 opacity-70">Resumen</p>
+        <p className="text-[10px] font-black uppercase tracking-widest mb-4 opacity-70">Resumen Interno</p>
         <div className="space-y-3">
           <div className="flex items-center gap-3"><Stethoscope size={18}/><p className="font-bold text-sm">{reserva.servicio}</p></div>
           <div className="flex items-center gap-3"><User size={18}/><p className="font-bold text-sm">{reserva.profesional?.nombre} {reserva.profesional?.apellido}</p></div>
@@ -285,11 +285,11 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
         </div>
       </div>
       <div className="space-y-3">
-        <input type="text" placeholder="Tu nombre" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500" onChange={(e) => setReserva({...reserva, paciente: {...reserva.paciente, nombre: e.target.value}})} />
-        <input type="email" placeholder="Tu email" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500" onChange={(e) => setReserva({...reserva, paciente: {...reserva.paciente, email: e.target.value}})} />
+        <input type="text" placeholder="Nombre del paciente" value={reserva.paciente.nombre} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500" onChange={(e) => setReserva({...reserva, paciente: {...reserva.paciente, nombre: e.target.value}})} />
+        <input type="email" placeholder="Email del paciente" value={reserva.paciente.email} className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500" onChange={(e) => setReserva({...reserva, paciente: {...reserva.paciente, email: e.target.value}})} />
       </div>
-      <button onClick={guardarReserva} disabled={enviando || !reserva.paciente.nombre} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-blue-100 active:scale-95 transition-all">
-        {enviando ? "Guardando..." : "Finalizar Reserva"}
+      <button type="button" onClick={guardarReserva} disabled={enviando || !reserva.paciente.nombre} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-blue-100 active:scale-95 transition-all disabled:opacity-50">
+        {enviando ? "Guardando..." : "Finalizar Reserva Interna"}
       </button>
     </div>
   );
@@ -313,7 +313,6 @@ export default function FormularioReserva() {
   }, []);
 
   return (
-    /* SE REFORZÓ EL BORDE: border-2 border-slate-300 para que sea visible */
     <div className="max-w-2xl mx-auto bg-white rounded-4xl shadow-2xl border-2 border-slate-300 overflow-visible relative">
       <div className="bg-gray-50/80 p-6 border-b border-gray-200 flex justify-between relative rounded-t-4xl">
         <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gray-200 -translate-y-1/2 px-10"></div>
@@ -328,7 +327,7 @@ export default function FormularioReserva() {
       <div className="p-8 md:p-12">
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-2xl font-black text-gray-900 tracking-tight">{PASOS[pasoActual - 1].nombre}</h2>
-          {pasoActual > 1 && <button onClick={() => setPasoActual(pasoActual - 1)} className="text-gray-400 font-bold text-xs uppercase flex items-center gap-1 hover:text-blue-600 transition-colors"><ChevronLeft size={14}/> Volver</button>}
+          {pasoActual > 1 && <button type="button" onClick={() => setPasoActual(pasoActual - 1)} className="text-gray-400 font-bold text-xs uppercase flex items-center gap-1 hover:text-blue-600 transition-colors"><ChevronLeft size={14}/> Volver</button>}
         </div>
 
         <AnimatePresence mode="wait">
