@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'; // 👈 ESTO OBLIGA A VERCEL A GENERAR LA URL REAL EN TIEMPO REAL
+
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { NextResponse } from 'next/server';
 
@@ -6,12 +8,12 @@ const client = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN 
 });
 
-export async function POST(request) { // 👈 Eliminado el ': Request'
+export async function POST(request) {
   try {
     const { servicio, precio, reservaData } = await request.json();
 
-    // 2. Definimos la URL base de tu túnel activo (Cloudflare de untun)
-    const baseUrl = "https://sea-explicit-combat-joined.trycloudflare.com";
+    // 2. Definimos la URL base apuntando a tu dominio de Vercel
+    const baseUrl = "https://clinica-app-orpin.vercel.app";
     const preference = new Preference(client);
 
     // 3. Creación de la preferencia
@@ -25,7 +27,6 @@ export async function POST(request) { // 👈 Eliminado el ': Request'
             currency_id: 'CLP',
           }
         ],
-        // Metadatos que recibirá el Webhook para guardar en Supabase
         metadata: { 
           profesional_id: reservaData.profesional_id,
           paciente_nombre: reservaData.paciente_nombre,
@@ -46,12 +47,10 @@ export async function POST(request) { // 👈 Eliminado el ': Request'
     });
 
     console.log("✅ Preferencia creada con éxito. ID:", result.id);
-
     return NextResponse.json({ init_point: result.init_point });
 
-  } catch (error) { // 👈 Eliminado el ': any'
+  } catch (error) {
     console.error("❌ Error detallado en Mercado Pago:", error);
-    
     return NextResponse.json({ 
       error: 'Error al crear el pago',
       details: error.message 
