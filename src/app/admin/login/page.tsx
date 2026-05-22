@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react"; // 👈 IMPORTANTE: Importamos React para usar FormEvent
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff, Lock, Mail, AlertCircle } from "lucide-react";
 
@@ -15,7 +15,8 @@ export default function AdminLogin() {
   const [intentos, setIntentos] = useState(0);
   const [bloqueado, setBloqueado] = useState(false);
 
-  const handleSubmit = async (e) => {
+  // 👈 CORREGIDO: Añadimos el tipo explícito React.FormEvent a 'e' para complacer a TypeScript
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (bloqueado) return;
@@ -55,7 +56,8 @@ export default function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 to-blue-900 flex items-center justify-center px-4">
+    // 👈 CORREGIDO: Cambiado bg-gradient-to-br por bg-linear-to-br según la sugerencia de Tailwind CSS v4
+    <div className="min-h-screen bg-linear-to-br from-blue-950 to-blue-900 flex items-center justify-center px-4">
       <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md">
 
         {/* Logo */}
