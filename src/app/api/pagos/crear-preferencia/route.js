@@ -12,20 +12,14 @@ export async function POST(request) {
     const bodyData = await request.json();
     console.log("📥 Datos recibidos en el backend:", bodyData);
 
-    // Extraemos las variables con respaldos por si vienen anidadas o directas
     const servicio = bodyData.servicio || bodyData.reservaData?.servicio || "Reserva Médica";
     const precioRaw = bodyData.precio || bodyData.reservaData?.precio || 15000;
-    
-    // Forzamos un número entero redondo (CLP no acepta decimales en Mercado Pago)
     const precioFinal = Math.round(Number(precioRaw));
-
-    // Extraemos reservaData de forma segura para evitar caídas por 'undefined'
     const rData = bodyData.reservaData || {};
 
     const baseUrl = "https://clinica-app-orpin.vercel.app";
     const preference = new Preference(client);
 
-    // Construcción de la preferencia optimizada para Sandbox Chile
     const result = await preference.create({
       body: {
         items: [
@@ -36,7 +30,6 @@ export async function POST(request) {
             currency_id: 'CLP',
           }
         ],
-        // Datos de auditoría para tu webhook/base de datos
         metadata: { 
           profesional_id: String(rData.profesional_id || "sin_id"),
           paciente_nombre: String(rData.paciente_nombre || "Paciente General"),
@@ -46,10 +39,9 @@ export async function POST(request) {
           fecha: String(rData.fecha || ""),
           hora: String(rData.hora || ""),
         },
-        // Obligatorio en algunos flujos de pruebas para validar la tarjeta sandbox
         payer: {
-          email: String(rData.paciente_email || "test_user_123@testuser.com"),
-          name: String(rData.paciente_nombre || "Carlos"),
+          email: "test_user_123@testuser.com", // Forzamos un mail genérico de sandbox puro
+          name: "Carlos",
         },
         back_urls: {
           success: `${baseUrl}/reservas/exito`,
@@ -57,7 +49,9 @@ export async function POST(request) {
           pending: `${baseUrl}/reservas`,
         },
         auto_return: 'approved',
-        notification_url: `${baseUrl}/api/pagos/webhook`,
+        
+        // 👈 COMENTADO TEMPORALMENTE: Si tu webhook da error 404 o 500, Mercado Pago cancela el pago con pantalla naranja
+        // notification_url: `${baseUrl}/api/pagos/webhook`,
       }
     });
 
