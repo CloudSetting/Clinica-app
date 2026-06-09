@@ -10,25 +10,23 @@ function ContenidoExito() {
   const [guardando, setGuardando] = useState(true);
   const [errorSupabase, setErrorSupabase] = useState(null);
 
-  // Capturamos los parámetros esenciales que vienen desde el formulario
   const status = searchParams.get("status");
   const paymentId = searchParams.get("payment_id");
   const pacienteNombre = searchParams.get("paciente_nombre");
   
+  // 👈 SE VUELVE ESTRICTO: Solo es aprobado si Mercado Pago explícitamente dice 'approved'
   const esAprobado = status === "approved";
 
   useEffect(() => {
     const registrarCitaTrasPago = async () => {
-      // Si el pago no está aprobado o no contiene los datos del paciente, detenemos el proceso
       if (!esAprobado || !pacienteNombre) {
         setGuardando(false);
         return;
       }
 
       try {
-        console.log("💾 ¡Pago confirmado en URL! Insertando cita en Supabase...");
+        console.log("💾 ¡Pago confirmado por pasarela! Guardando cita real...");
 
-        // Insertamos la fila mapeando exactamente los campos de tu tabla 'reservas'
         const { error } = await supabase
           .from("reservas")
           .insert([
@@ -40,8 +38,8 @@ function ContenidoExito() {
               paciente_email: searchParams.get("paciente_email"),
               paciente_telefono: searchParams.get("paciente_telefono"),
               servicio: searchParams.get("servicio"),
-              estado: "confirmada", // La cita se registra directamente como confirmada/pagada
-              tipo_pago: "mercado_pago_sandbox",
+              estado: "confirmada", 
+              tipo_pago: "mercado_pago",
               pago_id: paymentId
             }
           ]);
@@ -51,7 +49,6 @@ function ContenidoExito() {
         console.log("🎉 Cita guardada de forma exitosa en Supabase.");
       } catch (err) {
         console.error("❌ Error detectado al insertar en Supabase:", err);
-        // 👈 Eliminado el ': any' de TypeScript para evitar que rompa en archivos .jsx
         setErrorSupabase(err.message || "Error al intentar guardar en la base de datos.");
       } finally {
         setGuardando(false);
@@ -59,10 +56,8 @@ function ContenidoExito() {
     };
 
     registrarCitaTrasPago();
-    // 👈 Agregadas las dependencias obligatorias exigidas por las reglas de ESLint
   }, [esAprobado, searchParams, paymentId, pacienteNombre, setErrorSupabase]);
 
-  // PANTALLA A: Cargando (Se muestra mientras se ejecuta el insert en Supabase)
   if (esAprobado && guardando) {
     return (
       <div className="text-center py-10 max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
@@ -73,7 +68,6 @@ function ContenidoExito() {
     );
   }
 
-  // PANTALLA B: Éxito total (El pago fue aprobado Y la cita ya se guardó en Supabase)
   if (esAprobado && !errorSupabase) {
     return (
       <div className="text-center py-10 max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
@@ -110,7 +104,6 @@ function ContenidoExito() {
     );
   }
 
-  // PANTALLA C: Error (Si el pago falló o Supabase rechazó el registro)
   return (
     <div className="text-center py-10 max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
       <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -144,7 +137,6 @@ function ContenidoExito() {
   );
 }
 
-// Componente principal contenedor con Suspense integrado
 export default function PaginaExito() {
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">

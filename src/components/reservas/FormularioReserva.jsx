@@ -19,7 +19,7 @@ const PASOS = [
   { id: 4, nombre: "Pago y Confirmación", icono: <CreditCard size={20} /> },
 ];
 
-// --- COMPONENTES DE PASOS ---
+// --- PASO 1: SELECCIÓN DE SERVICIO ---
 const Paso1Servicio = ({ reserva, setReserva, irSiguiente }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
     {["Medicina General", "Psicología Clínica", "Nutrición", "Kinesiología"].map((s) => (
@@ -38,6 +38,7 @@ const Paso1Servicio = ({ reserva, setReserva, irSiguiente }) => (
   </div>
 );
 
+// --- PASO 2: SELECCIÓN DE PROFESIONAL ---
 const Paso2Profesional = ({ profesionales, reserva, setReserva, irSiguiente, cargando }) => {
   const servicioBuscado = reserva.servicio?.trim().toLowerCase();
   const filtrados = profesionales.filter(p => p.especialidad?.trim().toLowerCase() === servicioBuscado);
@@ -69,33 +70,32 @@ const Paso2Profesional = ({ profesionales, reserva, setReserva, irSiguiente, car
   );
 };
 
+// --- PASO 3: CALENDARIO Y DISPONIBILIDAD HORARIA ---
 const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
   const [mesActual, setMesActual] = useState(new Date());
   const [bloquesOcupados, setBloquesOcupados] = useState([]);
   const [cargandoHoras, setCargandoHoras] = useState(false);
 
- const fetchDispo = useCallback(async () => {
-  if (!reserva.fecha || !reserva.profesional) return;
-  setCargandoHoras(true);
-  try {
-    // 👈 CAMBIO CLAVE: Cambiamos "hora" por "hora_inicio" para coincidir con tu tabla de Supabase
-    const { data } = await supabase
-      .from("reservas")
-      .select("hora_inicio") 
-      .eq("profesional_id", reserva.profesional.id)
-      .eq("fecha", reserva.fecha)
-      .neq("estado", "cancelada");
-      
-    // Mapeamos de forma segura leyendo 'hora_inicio' y cortando los segundos
-    setBloquesOcupados(
-      data ? data.map(r => r.hora_inicio ? r.hora_inicio.substring(0, 5) : "") : []
-    );
-  } catch (err) { 
-    console.error("Error al obtener disponibilidad:", err); 
-  } finally { 
-    setCargandoHoras(false); 
-  }
-}, [reserva.fecha, reserva.profesional]);
+  const fetchDispo = useCallback(async () => {
+    if (!reserva.fecha || !reserva.profesional) return;
+    setCargandoHoras(true);
+    try {
+      const { data } = await supabase
+        .from("reservas")
+        .select("hora_inicio") 
+        .eq("profesional_id", reserva.profesional.id)
+        .eq("fecha", reserva.fecha)
+        .neq("estado", "cancelada");
+        
+      setBloquesOcupados(
+        data ? data.map(r => r.hora_inicio ? r.hora_inicio.substring(0, 5) : "") : []
+      );
+    } catch (err) { 
+      console.error("Error al obtener disponibilidad:", err); 
+    } finally { 
+      setCargandoHoras(false); 
+    }
+  }, [reserva.fecha, reserva.profesional]);
 
   useEffect(() => { fetchDispo(); }, [fetchDispo]);
 
@@ -159,6 +159,7 @@ const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
   );
 };
 
+// --- PASO 4: FORMULARIO Y PASARELA MERCADO PAGO REAL ---
 const Paso4Confirmar = ({ reserva, setReserva }) => {
   const [enviando, setEnviando] = useState(false);
   const [errores, setErrores] = useState({});
@@ -175,29 +176,39 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
   const iniciarPago = async () => {
     if (!validarForm()) return;
     setEnviando(true);
-
+    console.log("🚀 Generando preferencia real en Mercado Pago...");
+    
     try {
-      console.log("🚀 Redirigiendo a la pasarela simulada con los datos de la reserva...");
-
-      // Construcción limpia de query parameters con la info recolectada
-      const params = new URLSearchParams({
-        status: "approved", 
-        payment_id: "MP-SIMULADO-" + Math.floor(Math.random() * 1000000),
-        profesional_id: reserva.profesional?.id || "",
-        fecha: reserva.fecha || "",
-        hora_inicio: reserva.hora || "", 
-        paciente_nombre: reserva.paciente?.nombre || "",
-        paciente_telefono: reserva.paciente?.telefono || "",
-        paciente_email: reserva.paciente?.email || "",
-        servicio: reserva.servicio || ""
+      const response = await fetch('/api/pagos/crear-preferencia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          servicio: reserva.servicio,
+          precio: 15000,
+          reservaData: {
+            profesional_id: reserva.profesional?.id,
+            paciente_nombre: reserva.paciente.nombre,
+            paciente_email: reserva.paciente.email.trim().toLowerCase(), 
+            paciente_telefono: reserva.paciente.telefono,
+            servicio: reserva.servicio,
+            fecha: reserva.fecha,
+            hora_inicio: reserva.hora,
+            notas: reserva.notas || ""
+          }
+        })
       });
 
-      // Redireccionamos a la página de éxito enviando la carga útil
-      window.location.href = `/reservas/exito?${params.toString()}`;
+      const data = await response.json();
 
+      if (data.init_point) {
+        console.log("💳 Enlace de Mercado Pago generado. Redirigiendo...");
+        window.location.href = data.sandbox_init_point || data.init_point;
+      } else {
+        throw new Error(data.details || "No se pudo generar la pasarela de pago");
+      }
     } catch (err) {
-      console.error("❌ Error al procesar el pago simulado:", err);
-      alert("Hubo un problema al procesar la simulación del pago.");
+      console.error("❌ Error API Pago:", err);
+      alert(`Error al conectar con Mercado Pago: ${err.message}`);
     } finally {
       setEnviando(false);
     }
@@ -253,7 +264,7 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
   );
 };
 
-// --- COMPONENTE PRINCIPAL ---
+// --- COMPONENTE PRINCIPAL EXPORTADO ---
 export default function FormularioReserva() {
   const [pasoActual, setPasoActual] = useState(1);
   const [profesionales, setProfesionales] = useState([]);
