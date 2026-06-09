@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { 
   format, addMonths, subMonths, startOfMonth, endOfMonth, 
   startOfWeek, endOfWeek, isSameMonth, addDays, isBefore, startOfToday 
@@ -9,7 +8,7 @@ import {
 import { es } from "date-fns/locale";
 import { 
   ChevronLeft, ChevronRight, User, Stethoscope, 
-  Calendar as CalendarIcon, CheckCircle2, Loader2, Phone, Mail, FileText, CreditCard 
+  Calendar as CalendarIcon, Loader2, CreditCard 
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -165,6 +164,13 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
     console.log("🚀 Iniciando proceso de pago...");
     
     try {
+      // 👈 PROTECCIÓN DE SANDBOX: Si el correo ingresado es del admin/desarrollador, forzamos un correo de pruebas
+      // Esto evita de inmediato la pantalla naranja por error de "autopago".
+      const emailFormulario = reserva.paciente.email.trim().toLowerCase();
+      const emailFinalParaMP = emailFormulario.includes("setting.cl") 
+        ? "test_user_123@testuser.com" 
+        : emailFormulario;
+
       const response = await fetch('/api/pagos/crear-preferencia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,9 +178,9 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
           servicio: reserva.servicio,
           precio: 15000,
           reservaData: {
-            profesional_id: reserva.profesional.id,
+            profesional_id: reserva.profesional?.id,
             paciente_nombre: reserva.paciente.nombre,
-            paciente_email: reserva.paciente.email,
+            paciente_email: emailFinalParaMP, // Envia el mail sanitizado para Sandbox
             paciente_telefono: reserva.paciente.telefono,
             servicio: reserva.servicio,
             fecha: reserva.fecha,
@@ -186,6 +192,7 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
 
       const data = await response.json();
       if (data.init_point) {
+        // Redirección de ventana completa limpia y asíncrona
         window.location.href = data.init_point;
       } else {
         throw new Error(data.details || "No se pudo generar la pasarela de pago");
