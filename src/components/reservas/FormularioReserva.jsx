@@ -38,9 +38,11 @@ const Paso1Servicio = ({ reserva, setReserva, irSiguiente }) => (
   </div>
 );
 
-// --- PASO 2: SELECCIÓN DE PROFESIONAL ---
+// --- PASO 2: SELECCIÓN DE PROFESIONAL (REPARADO CON TRIM) ---
 const Paso2Profesional = ({ profesionales, reserva, setReserva, irSiguiente, cargando }) => {
   const servicioBuscado = reserva.servicio?.trim().toLowerCase();
+  
+  // .trim() elimina cualquier espacio rebelde al inicio o final que venga de la Base de Datos
   const filtrados = profesionales.filter(p => p.especialidad?.trim().toLowerCase() === servicioBuscado);
   const listaAMostrar = filtrados.length > 0 ? filtrados : profesionales;
 
@@ -159,7 +161,7 @@ const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
   );
 };
 
-// --- PASO 4: FORMULARIO Y PASARELA MERCADO PAGO REAL ---
+// --- PASO 4: FORMULARIO Y PASARELA (CALCULA HORA_FIN) ---
 const Paso4Confirmar = ({ reserva, setReserva }) => {
   const [enviando, setEnviando] = useState(false);
   const [errores, setErrores] = useState({});
@@ -176,7 +178,12 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
   const iniciarPago = async () => {
     if (!validarForm()) return;
     setEnviando(true);
-    console.log("🚀 Generando preferencia real en Mercado Pago...");
+    
+    // Calculamos dinámicamente la hora de fin (sumando 1 hora) para no romper el NOT NULL de Supabase
+    const horaEntera = parseInt(reserva.hora.split(":")[0], 10);
+    const horaFinCalculada = `${String(horaEntera + 1).padStart(2, "0")}:00`;
+
+    console.log("🚀 Generando preferencia en Mercado Pago con datos estructurados...");
     
     try {
       const response = await fetch('/api/pagos/crear-preferencia', {
@@ -190,9 +197,9 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
             paciente_nombre: reserva.paciente.nombre,
             paciente_email: reserva.paciente.email.trim().toLowerCase(), 
             paciente_telefono: reserva.paciente.telefono,
-            servicio: reserva.servicio,
             fecha: reserva.fecha,
             hora_inicio: reserva.hora,
+            hora_fin: horaFinCalculada, // 👈 ENVIADO: Cumple con la nueva columna obligatoria
             notas: reserva.notas || ""
           }
         })
@@ -201,7 +208,6 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
       const data = await response.json();
 
       if (data.init_point) {
-        console.log("💳 Enlace de Mercado Pago generado. Redirigiendo...");
         window.location.href = data.sandbox_init_point || data.init_point;
       } else {
         throw new Error(data.details || "No se pudo generar la pasarela de pago");
