@@ -179,35 +179,52 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
     if (!validarForm()) return;
     setEnviando(true);
     
-    // Calculamos dinámicamente la hora de fin (sumando 1 hora) para no romper el NOT NULL de Supabase
+    // Calculamos la hora de fin (+1 hora) para no romper el NOT NULL de Supabase
     const horaEntera = parseInt(reserva.hora.split(":")[0], 10);
     const horaFinCalculada = `${String(horaEntera + 1).padStart(2, "0")}:00`;
 
-    console.log("🚀 Generando preferencia en Mercado Pago con datos estructurados...");
+    console.log("🚀 Generando preferencia en Mercado Pago con parámetros URL seguros...");
     
     try {
+      // 1. Preparamos los parámetros limpios que queremos que vuelvan a nuestra página de éxito
+      const datosUrl = new URLSearchParams({
+        profesional_id: reserva.profesional?.id || "",
+        paciente_nombre: reserva.paciente.nombre || "",
+        paciente_email: reserva.paciente.email.trim().toLowerCase(), 
+        paciente_telefono: reserva.paciente.telefono || "",
+        fecha: reserva.fecha || "",
+        hora_inicio: reserva.hora || "",
+        hora_fin: horaFinCalculada,
+        servicio: reserva.servicio || ""
+      });
+
+      // 2. Llamamos a tu API pasándole los datos
       const response = await fetch('/api/pagos/crear-preferencia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           servicio: reserva.servicio,
           precio: 15000,
+          // Mandamos los datos estructurados al backend
           reservaData: {
             profesional_id: reserva.profesional?.id,
             paciente_nombre: reserva.paciente.nombre,
-            paciente_email: reserva.paciente.email.trim().toLowerCase(), 
+            paciente_email: reserva.paciente.email.trim().toLowerCase(),
             paciente_telefono: reserva.paciente.telefono,
             fecha: reserva.fecha,
             hora_inicio: reserva.hora,
-            hora_fin: horaFinCalculada, // 👈 ENVIADO: Cumple con la nueva columna obligatoria
-            notas: reserva.notas || ""
-          }
+            hora_fin: horaFinCalculada
+          },
+          // 👈 TRUCO MAESTRO: Forzamos a Mercado Pago a que al volver exitosamente, 
+          // inyecte los datos directamente en la barra de direcciones de nuestra página de éxito
+          queryRedirect: datosUrl.toString()
         })
       });
 
       const data = await response.json();
 
       if (data.init_point) {
+        console.log("💳 Enlace de Mercado Pago listo. Redirigiendo...");
         window.location.href = data.sandbox_init_point || data.init_point;
       } else {
         throw new Error(data.details || "No se pudo generar la pasarela de pago");
@@ -306,7 +323,7 @@ export default function FormularioReserva() {
         ))}
       </div>
 
-      <div className="p-8 min-h-[550px]">
+     <div className="p-8 min-h-137.5">
         <div className="mb-8 flex items-center justify-between">
           <h2 className="text-2xl font-black text-gray-900">{PASOS[pasoActual - 1].nombre}</h2>
           {pasoActual > 1 && (

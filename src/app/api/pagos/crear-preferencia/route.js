@@ -10,12 +10,11 @@ const client = new MercadoPagoConfig({
 export async function POST(request) {
   try {
     const bodyData = await request.json();
-    const rData = bodyData.reservaData || {};
+    const queryRedirect = bodyData.queryRedirect || ""; // Capturamos los strings de datos del formulario
 
     const baseUrl = "https://clinica-app-orpin.vercel.app";
     const preference = new Preference(client);
 
-    // Creamos la preferencia empaquetando la información clave en metadata
     const result = await preference.create({
       body: {
         items: [
@@ -26,19 +25,9 @@ export async function POST(request) {
             currency_id: 'CLP',
           }
         ],
-        metadata: { 
-          // Guardamos todo en minúsculas para mapearlo sin problemas al volver
-          profesional_id: String(rData.profesional_id || ""),
-          fecha: String(rData.fecha || ""),
-          hora_inicio: String(rData.hora_inicio || ""),
-          hora_fin: String(rData.hora_fin || ""),
-          paciente_nombre: String(rData.paciente_nombre || ""),
-          paciente_email: String(rData.paciente_email || ""),
-          paciente_telefono: String(rData.paciente_telefono || ""),
-          servicio: String(bodyData.servicio || "")
-        },
         back_urls: {
-          success: `${baseUrl}/reservas/exito`,
+          // Concatenamos los parámetros del formulario a la URL de éxito real de Mercado Pago
+          success: `${baseUrl}/reservas/exito?${queryRedirect}`,
           failure: `${baseUrl}/reservas`,
           pending: `${baseUrl}/reservas`,
         },
