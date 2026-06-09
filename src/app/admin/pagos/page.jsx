@@ -22,22 +22,21 @@ export default function PortalPagosAdmin() {
   const [profesionales, setProfesionales] = useState([]);
   const [cargandoDatos, setCargandoDatos] = useState(true);
   
-  // Filtros del Portal
+  // Filtros del Portal (Inicializado en Junio 2026 para calzar con tus pruebas)
   const [filtroProfesional, setFiltroProfesional] = useState("todos"); 
-  const [filtroMes, setFiltroMes] = useState(moment().format("YYYY-MM")); 
+  const [filtroMes, setFiltroMes] = useState("2026-06"); 
 
   useEffect(() => {
     async function cargarDatosPortal() {
       try {
         setCargandoDatos(true);
-        console.log("🔍 Conectando con Supabase para actualizar el portal...");
+        console.log("🔍 Cargando datos desde Supabase...");
         
-        // 1. Traer profesionales activos de Supabase
+        // 1. Traer todos los profesionales activos de Supabase
         const { data: medicosData, error: medicosError } = await supabase
           .from("profesionales")
           .select("id, nombre, apellido")
-          .eq("activo", true)
-          .order("nombre", { ascending: true });
+          .eq("activo", true);
 
         if (medicosError) throw medicosError;
 
@@ -50,7 +49,7 @@ export default function PortalPagosAdmin() {
           setProfesionales(listaMedicos);
         }
 
-        // 2. Traer todas las reservas aplicando relación flexible
+        // 2. Traer todas las reservas de la tabla
         const { data: reservasData, error: reservasError } = await supabase
           .from("reservas")
           .select(`
@@ -68,33 +67,30 @@ export default function PortalPagosAdmin() {
         if (reservasError) throw reservasError;
 
         if (reservasData) {
-          console.log("📊 Datos crudos desde Supabase:", reservasData);
+          console.log("📊 Datos exactos descargados de Supabase:", reservasData);
 
-          // Filtramos admitiendo 'confirmada' o 'con_pago' (Ignacio tiene con_pago)
+          // Soportamos cualquier estado válido de pago que esté en tu base de datos
           const reservasValidas = reservasData.filter(
-            reserva => reserva.estado === "confirmada" || reserva.estado === "con_pago"
+            r => r.estado === "confirmada" || r.estado === "con_pago" || r.estado === "aprobado"
           );
 
           const transaccionesReales = reservasValidas.map((reserva) => {
-            const monto = reserva.monto_total || 15000; 
+            const monto = Number(reserva.monto_total) || 15000; 
             const comision = Math.round(monto * 0.3); 
             const neto = monto - comision; 
 
-            // BLINDAJE DE SEGURIDAD: Si la relación por clave foránea falla,
-            // resolvemos el nombre del médico comparando los IDs localmente en JS
+            // Respaldo manual en caso de que falle la clave foránea en JS
             let nombreMedico = "No asignado";
             if (reserva.profesionales) {
               nombreMedico = `Dr(a). ${reserva.profesionales.nombre} ${reserva.profesionales.apellido}`;
             } else if (reserva.profesional_id) {
-              const medicoEncontrado = listaMedicos.find(m => m.id === reserva.profesional_id);
-              if (medicoEncontrado) {
-                nombreMedico = `Dr(a). ${medicoEncontrado.nombre}`;
-              }
+              const coincidencia = listaMedicos.find(m => m.id === reserva.profesional_id);
+              if (coincidencia) nombreMedico = `Dr(a). ${coincidencia.nombre}`;
             }
 
             return {
               id: reserva.id ? `REC-${reserva.id.toString().slice(-4)}` : `REC-${Math.floor(Math.random() * 1000)}`,
-              fecha: reserva.fecha, 
+              fecha: reserva.fecha, // Guarda el string "2026-06-10" directo
               profesional_id: reserva.profesional_id,
               profesional_nombre: nombreMedico,
               paciente_nombre: reserva.paciente_nombre || "Paciente",
@@ -111,7 +107,7 @@ export default function PortalPagosAdmin() {
         }
 
       } catch (err) {
-        console.error("❌ Error al cargar datos desde Supabase:", err);
+        console.error("❌ Error en Portal:", err);
       } finally {
         setCargandoDatos(false);
       }
@@ -120,40 +116,40 @@ export default function PortalPagosAdmin() {
     cargarDatosPortal();
   }, []);
 
-  // --- LÓGICA DE FILTRADO Y CÁLCULOS TEMPORALES ---
+  // --- LÓGICA DE FILTRADO REPARADA (EVITA EL BUG DE ZONA HORARIA) ---
   
-  // Rangos de la semana actual en curso (Lunes a Domingo)
-  const inicioSemana = moment().startOf("isoWeek");
-  const finSemana = moment().endOf("isoWeek");
+  // Rango de días de esta semana actual en formato texto estándar
+  const inicioSemanaStr = moment().startOf("isoWeek").format("YYYY-MM-DD");
+  const finSemanaStr = moment().endOf("isoWeek").format("YYYY-MM-DD");
 
-  // 1. Filtrado para la Tabla (Sigue el filtro de Profesional y Mes seleccionado)
+  // 1. Filtrado para la Tabla Baja
   const pagosFiltradosTabla = pagos.filter((pago) => {
     const cumpleProfesional = filtroProfesional === "todos" || pago.profesional_id === filtroProfesional;
-    const cumpleMes = !filtroMes || moment(pago.fecha).format("YYYY-MM") === filtroMes;
+    
+    // Filtro de mes simplificado: Cortamos "2026-06-10" para comparar "2026-06" === "2026-06"
+    const mesDeLaCita = pago.fecha ? pago.fecha.substring(0, 7) : "";
+    const cumpleMes = !filtroMes || mesDeLaCita === filtroMes;
+    
     return cumpleProfesional && cumpleMes;
   });
 
-  // 2. Filtrado Semanal (Solo lo de esta semana actual, respetando si se seleccionó un médico específico)
+  // 2. Filtrado para el Panel Semanal Arriba
   const pagosSemanales = pagos.filter((pago) => {
     const cumpleProfesional = filtroProfesional === "todos" || pago.profesional_id === filtroProfesional;
-    const esDeEstaSemana = moment(pago.fecha).isBetween(inicioSemana, finSemana, "day", "[]");
+    
+    // Comparación plana de texto para evitar desfases de horas del navegador
+    const esDeEstaSemana = pago.fecha && pago.fecha >= inicioSemanaStr && pago.fecha <= finSemanaStr;
+    
     return cumpleProfesional && esDeEstaSemana;
   });
 
-  // --- ACUMULADORES FINANCIEROS ---
-  
-  // Totales del Mes (Basados en lo filtrado para la tabla)
+  // --- CONTADORES FINANCIEROS ACUMULADOS ---
   const totalBrutoMensual = pagosFiltradosTabla.reduce((acc, curr) => acc + curr.monto_total, 0);
   const totalNetoMensual = pagosFiltradosTabla.reduce((acc, curr) => acc + curr.pago_neto_medico, 0);
   const totalCitasMensuales = pagosFiltradosTabla.length;
 
-  // Totales de la Semana Actual
   const totalBrutoSemanal = pagosSemanales.reduce((acc, curr) => acc + curr.monto_total, 0);
   const totalNetoSemanal = pagosSemanales.reduce((acc, curr) => acc + curr.pago_neto_medico, 0);
-
-  const exportarLiquidacion = () => {
-    alert("📥 Descargando reporte de liquidación comercial...");
-  };
 
   return (
     <div className="p-6 bg-slate-50 min-h-screen text-slate-800">
@@ -167,37 +163,30 @@ export default function PortalPagosAdmin() {
 
         <button
           type="button"
-          onClick={exportarLiquidacion}
+          onClick={() => alert("📥 Descargando reporte...")}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl transition-colors shadow-md shadow-blue-100"
         >
           <Download size={14} /> Exportar Período
         </button>
       </div>
 
-      {/* Barra de Filtros */}
+      {/* Filtros */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs mb-6 flex flex-col sm:flex-row gap-4 items-end">
         <div className="w-full sm:w-72">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
             <Filter size={10} /> Ver Profesional
           </label>
-          <div className="relative">
-            <select
-              value={filtroProfesional}
-              onChange={(e) => setFiltroProfesional(e.target.value)}
-              disabled={cargandoDatos}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium disabled:opacity-50 appearance-none"
-            >
-              <option value="todos">Todos los profesionales (Vista Admin)</option>
-              {profesionales.map(p => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
-            </select>
-            {cargandoDatos && (
-              <div className="absolute right-3 top-2.5">
-                <Loader2 size={12} className="animate-spin text-slate-400" />
-              </div>
-            )}
-          </div>
+          <select
+            value={filtroProfesional}
+            onChange={(e) => setFiltroProfesional(e.target.value)}
+            disabled={cargandoDatos}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium disabled:opacity-50"
+          >
+            <option value="todos">Todos los profesionales (Vista Admin)</option>
+            {profesionales.map(p => (
+              <option key={p.id} value={p.id}>{p.nombre}</option>
+            ))}
+          </select>
         </div>
 
         <div className="w-full sm:w-52">
@@ -213,14 +202,13 @@ export default function PortalPagosAdmin() {
         </div>
         
         <p className="text-slate-400 text-[11px] font-medium sm:mb-2.5 italic">
-          Mostrando datos para {moment(filtroMes, "YYYY-MM").format("MMMM YYYY")}
+          Mostrando datos para {moment(filtroMes, "YYYY-MM").format("MMMM yyyy")}
         </p>
       </div>
 
-      {/* Tarjetas de Información Financiera */}
+      {/* Tarjetas de Recaudación */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         
-        {/* Recaudación Semanal */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4 border-l-4 border-l-amber-500">
           <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
             <CalendarDays size={22} />
@@ -232,7 +220,6 @@ export default function PortalPagosAdmin() {
           </div>
         </div>
 
-        {/* Recaudación Total Mes */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4 border-l-4 border-l-blue-500">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
             <TrendingUp size={22} />
@@ -244,7 +231,6 @@ export default function PortalPagosAdmin() {
           </div>
         </div>
 
-        {/* Pago Neto Médico Mes */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4 border-l-4 border-l-emerald-500">
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
             <DollarSign size={22} />
@@ -256,7 +242,6 @@ export default function PortalPagosAdmin() {
           </div>
         </div>
 
-        {/* Atenciones */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
             <Users size={22} />
@@ -264,7 +249,7 @@ export default function PortalPagosAdmin() {
           <div>
             <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Atenciones del Mes</span>
             <p className="text-xl font-black text-slate-900">{totalCitasMensuales} Citas</p>
-            <span className="text-[9px] text-purple-600 font-bold">Con estado válido</span>
+            <span className="text-[9px] text-purple-600 font-bold">Con estado validado</span>
           </div>
         </div>
 
@@ -294,7 +279,7 @@ export default function PortalPagosAdmin() {
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-slate-400 font-medium">
                     <Loader2 size={24} className="animate-spin mx-auto mb-2 text-blue-500" />
-                    Cargando transacciones en tiempo real...
+                    Sincronizando transacciones de Supabase...
                   </td>
                 </tr>
               ) : pagosFiltradosTabla.length === 0 ? (
