@@ -11,99 +11,132 @@ import {
   FileText, 
   Download,
   Filter,
-  Loader2
+  Loader2,
+  CalendarDays
 } from "lucide-react";
-// ⚠️ Importamos tu instancia de Supabase configurada
 import { supabase } from "@/lib/supabase";
 
 moment.locale("es");
 
-// Mock temporal de transacciones hasta que conectes la tabla de cobros
-const HISTORIAL_PAGOS_MOCK = [
-  {
-    id: "REC-001",
-    fecha: "2026-06-08",
-    profesional_id: "p1", // Mantenlo sincronizado con tus IDs reales para ver el cruce
-    profesional_nombre: "Dra. Ana María Silva",
-    paciente_nombre: "Carlos Mendoza",
-    servicio: "Psicología Clínica",
-    monto_total: 45000,
-    comision_clinica: 13500,
-    pago_neto_medico: 31500,
-    metodo_pago: "Mercado Pago (Tarjeta)",
-    estado: "Liquidado"
-  },
-  {
-    id: "REC-002",
-    fecha: "2026-06-05",
-    profesional_id: "p1",
-    profesional_nombre: "Dra. Ana María Silva",
-    paciente_nombre: "María José Prieto",
-    servicio: "Psicología Clínica",
-    monto_total: 45000,
-    comision_clinica: 13500,
-    pago_neto_medico: 31500,
-    metodo_pago: "Mercado Pago (Efectivo)",
-    estado: "Liquidado"
-  }
-];
-
 export default function PortalPagosAdmin() {
-  const [pagos, setPagos] = useState(HISTORIAL_PAGOS_MOCK);
-  // Inicializamos profesionales como un arreglo vacío listo para la base de datos
+  const [pagos, setPagos] = useState([]);
   const [profesionales, setProfesionales] = useState([]);
-  const [cargandoMedicos, setCargandoMedicos] = useState(true);
+  const [cargandoDatos, setCargandoDatos] = useState(true);
   
-  // Filtros del Portal: Cambiado a "todos" por defecto para mejor experiencia de Admin
+  // Filtros del Portal
   const [filtroProfesional, setFiltroProfesional] = useState("todos"); 
   const [filtroMes, setFiltroMes] = useState(moment().format("YYYY-MM")); 
 
   useEffect(() => {
     async function cargarDatosPortal() {
       try {
-        setCargandoMedicos(true);
-        console.log("🔍 Cargando nómina de profesionales desde Supabase...");
+        setCargandoDatos(true);
         
-        // Consultamos la tabla real usando la estructura exacta compartida
-        const { data, error } = await supabase
+        // 1. Traer profesionales activos de Supabase
+        const { data: medicosData, error: medicosError } = await supabase
           .from("profesionales")
           .select("id, nombre, apellido")
           .eq("activo", true)
           .order("nombre", { ascending: true });
 
-        if (error) throw error;
+        if (medicosError) throw medicosError;
 
-        if (data) {
-          // Transformamos el formato mapeando nombre + apellido para el selector
-          const listaFormateada = data.map(p => ({
+        if (medicosData) {
+          const listaFormateada = medicosData.map(p => ({
             id: p.id,
             nombre: `${p.nombre} ${p.apellido}`
           }));
           setProfesionales(listaFormateada);
         }
 
+        // 2. Traer todas las reservas de Supabase
+        const { data: reservasData, error: reservasError } = await supabase
+          .from("reservas")
+          .select(`
+            id,
+            fecha,
+            paciente_nombre,
+            servicio,
+            monto_total,
+            metodo_pago,
+            estado,
+            profesional_id,
+            profesionales (nombre, apellido)
+          `);
+
+        if (reservasError) throw reservasError;
+
+        if (reservasData) {
+          // Filtramos las que tengan un estado de pago válido
+          const reservasValidas = reservasData.filter(
+            reserva => reserva.estado === "confirmada" || reserva.estado === "con_pago"
+          );
+
+          const transaccionesReales = reservasValidas.map((reserva) => {
+            const monto = reserva.monto_total || 15000; 
+            const comision = Math.round(monto * 0.3); 
+            const neto = monto - comision; 
+
+            return {
+              id: reserva.id ? `REC-${reserva.id.toString().slice(-4)}` : `REC-${Math.floor(Math.random() * 1000)}`,
+              fecha: reserva.fecha, 
+              profesional_id: reserva.profesional_id,
+              profesional_nombre: reserva.profesionales 
+                ? `Dr(a). ${reserva.profesionales.nombre} ${reserva.profesionales.apellido}` 
+                : "No asignado",
+              paciente_nombre: reserva.paciente_nombre || "Paciente",
+              servicio: reserva.servicio || "Medicina General",
+              monto_total: monto,
+              comision_clinica: comision,
+              pago_neto_medico: neto,
+              metodo_pago: reserva.metodo_pago || "Mercado Pago",
+              estado: "Liquidado"
+            };
+          });
+
+          setPagos(transaccionesReales);
+        }
+
       } catch (err) {
-        console.error("❌ Error al traer profesionales de Supabase:", err);
+        console.error("❌ Error al cargar datos desde Supabase:", err);
       } finally {
-        setCargandoMedicos(false);
+        setCargandoDatos(false);
       }
     }
 
     cargarDatosPortal();
   }, []);
 
-  // Lógica de filtrado unificada
-  const pagosFiltrados = pagos.filter((pago) => {
+  // --- LÓGICA DE FILTRADO Y CÁLCULOS TEMPORALES ---
+  
+  // Rangos de la semana actual en curso (Lunes a Domingo)
+  const inicioSemana = moment().startOf("isoWeek");
+  const finSemana = moment().endOf("isoWeek");
+
+  // 1. Filtrado para la Tabla (Sigue el filtro de Profesional y Mes seleccionado)
+  const pagosFiltradosTabla = pagos.filter((pago) => {
     const cumpleProfesional = filtroProfesional === "todos" || pago.profesional_id === filtroProfesional;
     const cumpleMes = !filtroMes || moment(pago.fecha).format("YYYY-MM") === filtroMes;
     return cumpleProfesional && cumpleMes;
   });
 
-  // Cálculos Financieros Acumulados
-  const totalRecaudadoClinica = pagosFiltrados.reduce((acc, curr) => acc + curr.monto_total, 0);
-  const totalNetoProfesional = pagosFiltrados.reduce((acc, curr) => acc + curr.pago_neto_medico, 0);
-  const totalCitasCobradas = pagosFiltrados.length;
-  const promedioPorCita = totalCitasCobradas > 0 ? Math.round(totalNetoProfesional / totalCitasCobradas) : 0;
+  // 2. Filtrado Semanal (Solo lo de esta semana, respetando si se seleccionó un médico específico)
+  const pagosSemanales = pagos.filter((pago) => {
+    const cumpleProfesional = filtroProfesional === "todos" || pago.profesional_id === filtroProfesional;
+    const esDeEstaSemana = moment(pago.fecha).isBetween(inicioSemana, finSemana, "day", "[]");
+    return cumpleProfesional && esDeEstaSemana;
+  });
+
+  // --- ACUMULADORES FINANCIEROS ---
+  
+  // Mensuales (Basados en lo filtrado para la tabla)
+  const totalBrutoMensual = pagosFiltradosTabla.reduce((acc, curr) => acc + curr.monto_total, 0);
+  const totalNetoMensual = pagosFiltradosTabla.reduce((acc, curr) => acc + curr.pago_neto_medico, 0);
+  const totalCitasMensuales = pagosFiltradosTabla.length;
+
+  // Semanales
+  const totalBrutoSemanal = pagosSemanales.reduce((acc, curr) => acc + curr.monto_total, 0);
+  const totalNetoSemanal = pagosSemanales.reduce((acc, curr) => acc + curr.pago_neto_medico, 0);
 
   const exportarLiquidacion = () => {
     alert("📥 Descargando reporte de liquidación en formato PDF/Excel...");
@@ -128,7 +161,7 @@ export default function PortalPagosAdmin() {
         </button>
       </div>
 
-      {/* --- BARRA DE FILTROS (MES Y PROFESIONAL) --- */}
+      {/* --- BARRA DE FILTROS --- */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs mb-6 flex flex-col sm:flex-row gap-4 items-end">
         <div className="w-full sm:w-72">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
@@ -138,7 +171,7 @@ export default function PortalPagosAdmin() {
             <select
               value={filtroProfesional}
               onChange={(e) => setFiltroProfesional(e.target.value)}
-              disabled={cargandoMedicos}
+              disabled={cargandoDatos}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium disabled:opacity-50 appearance-none"
             >
               <option value="todos">Todos los profesionales (Vista Admin)</option>
@@ -146,7 +179,7 @@ export default function PortalPagosAdmin() {
                 <option key={p.id} value={p.id}>{p.nombre}</option>
               ))}
             </select>
-            {cargandoMedicos && (
+            {cargandoDatos && (
               <div className="absolute right-3 top-2.5">
                 <Loader2 size={12} className="animate-spin text-slate-400" />
               </div>
@@ -171,56 +204,60 @@ export default function PortalPagosAdmin() {
         </p>
       </div>
 
-      {/* --- TARJETAS DE PANEL DE LIQUIDACIÓN --- */}
+      {/* --- TARJETAS FINANCIERAS (VALOR SEMANAL Y TOTAL DEL MES) --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-            <DollarSign size={22} />
+        {/* PANEL 1: VALOR SEMANAL BRUTO Y NETO */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4 border-l-4 border-l-amber-500">
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+            <CalendarDays size={22} />
           </div>
           <div>
-            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">A Recibir (Neto)</span>
-            <p className="text-xl font-black text-slate-900">${totalNetoProfesional.toLocaleString("es-CL")}</p>
-            <span className="text-[9px] text-emerald-600 font-bold">70% del valor total</span>
+            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Recaudación Semanal</span>
+            <p className="text-xl font-black text-slate-900">${totalBrutoSemanal.toLocaleString("es-CL")}</p>
+            <span className="text-[9px] text-amber-600 font-bold">Neto Médico: ${totalNetoSemanal.toLocaleString("es-CL")}</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+        {/* PANEL 2: VALOR TOTAL BRUTO DEL MES */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4 border-l-4 border-l-blue-500">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
             <TrendingUp size={22} />
           </div>
           <div>
-            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Recaudación Bruta</span>
-            <p className="text-xl font-black text-slate-900">${totalRecaudadoClinica.toLocaleString("es-CL")}</p>
-            <span className="text-[9px] text-slate-400 font-medium">Comisión clínica: ${(totalRecaudadoClinica - totalNetoProfesional).toLocaleString("es-CL")}</span>
+            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Recaudación Total Mes</span>
+            <p className="text-xl font-black text-slate-900">${totalBrutoMensual.toLocaleString("es-CL")}</p>
+            <span className="text-[9px] text-slate-400 font-medium">Comisión Clínica (30%): ${(totalBrutoMensual - totalNetoMensual).toLocaleString("es-CL")}</span>
           </div>
         </div>
 
+        {/* PANEL 3: VALOR NETO MÉDICO DEL MES */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4 border-l-4 border-l-emerald-500">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+            <DollarSign size={22} />
+          </div>
+          <div>
+            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Pago Neto Médico Mes</span>
+            <p className="text-xl font-black text-slate-900">${totalNetoMensual.toLocaleString("es-CL")}</p>
+            <span className="text-[9px] text-emerald-600 font-bold">70% Líquido Transferible</span>
+          </div>
+        </div>
+
+        {/* PANEL 4: ATENCIONES DEL MES */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
             <Users size={22} />
           </div>
           <div>
-            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Atenciones Totales</span>
-            <p className="text-xl font-black text-slate-900">{totalCitasCobradas} Citas</p>
-            <span className="text-[9px] text-amber-600 font-bold">Con pago confirmado</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
-            <FileText size={22} />
-          </div>
-          <div>
-            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Honorario Promedio</span>
-            <p className="text-xl font-black text-slate-900">${promedioPorCita.toLocaleString("es-CL")}</p>
-            <span className="text-[9px] text-slate-400 font-medium">Valor neto por hora</span>
+            <span className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Atenciones del Mes</span>
+            <p className="text-xl font-black text-slate-900">{totalCitasMensuales} Citas</p>
+            <span className="text-[9px] text-purple-600 font-bold">Con estado validado</span>
           </div>
         </div>
 
       </div>
 
-      {/* --- TABLA DE DETALLE DE COMPROBANTES DE INGRESO --- */}
+      {/* --- TABLA DE DESGLOSE --- */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50">
           <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider">Desglose analítico de transacciones</h2>
@@ -240,18 +277,25 @@ export default function PortalPagosAdmin() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
-              {pagosFiltrados.length === 0 ? (
+              {cargandoDatos ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-12 text-slate-400 font-medium">
+                    <Loader2 size={24} className="animate-spin mx-auto mb-2 text-blue-500" />
+                    Cargando transacciones en tiempo real...
+                  </td>
+                </tr>
+              ) : pagosFiltradosTabla.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-slate-400 font-medium">
                     No existen registros de cobros o liquidaciones para este período comercial.
                   </td>
                 </tr>
               ) : (
-                pagosFiltrados.map((pago) => (
+                pagosFiltradosTabla.map((pago) => (
                   <tr key={pago.id} className="hover:bg-slate-50/40 transition-colors">
                     <td className="px-6 py-4 font-mono font-bold text-slate-500">{pago.id}</td>
                     <td className="px-6 py-4 text-slate-600 font-bold">
-                      {moment(pago.fecha).format("DD [de] MMM, YYYY")}
+                      {pago.fecha ? moment(pago.fecha).format("DD [de] MMM, YYYY") : "Sin Fecha"}
                     </td>
                     <td className="px-6 py-4 text-slate-900 font-bold">{pago.profesional_nombre}</td>
                     <td className="px-6 py-4">
