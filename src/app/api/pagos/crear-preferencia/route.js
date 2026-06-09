@@ -10,38 +10,32 @@ const client = new MercadoPagoConfig({
 export async function POST(request) {
   try {
     const bodyData = await request.json();
-    console.log("📥 Datos recibidos en el backend:", bodyData);
-
-    const servicio = bodyData.servicio || bodyData.reservaData?.servicio || "Reserva Médica";
-    const precioRaw = bodyData.precio || bodyData.reservaData?.precio || 15000;
-    const precioFinal = Math.round(Number(precioRaw));
     const rData = bodyData.reservaData || {};
 
     const baseUrl = "https://clinica-app-orpin.vercel.app";
     const preference = new Preference(client);
 
+    // Creamos la preferencia empaquetando la información clave en metadata
     const result = await preference.create({
       body: {
         items: [
           {
-            title: String(servicio),
+            title: String(bodyData.servicio || "Atención Médica"),
             quantity: 1,
-            unit_price: precioFinal,
+            unit_price: Math.round(Number(bodyData.precio || 15000)),
             currency_id: 'CLP',
           }
         ],
         metadata: { 
-          profesional_id: String(rData.profesional_id || "sin_id"),
-          paciente_nombre: String(rData.paciente_nombre || "Paciente General"),
-          paciente_email: String(rData.paciente_email || "test@test.com"),
-          paciente_telefono: String(rData.paciente_telefono || "912345678"),
-          servicio: String(servicio),
+          // Guardamos todo en minúsculas para mapearlo sin problemas al volver
+          profesional_id: String(rData.profesional_id || ""),
           fecha: String(rData.fecha || ""),
-          hora: String(rData.hora || ""),
-        },
-        payer: {
-          email: "test_user_123@testuser.com", 
-          name: "Carlos",
+          hora_inicio: String(rData.hora_inicio || ""),
+          hora_fin: String(rData.hora_fin || ""),
+          paciente_nombre: String(rData.paciente_nombre || ""),
+          paciente_email: String(rData.paciente_email || ""),
+          paciente_telefono: String(rData.paciente_telefono || ""),
+          servicio: String(bodyData.servicio || "")
         },
         back_urls: {
           success: `${baseUrl}/reservas/exito`,
@@ -52,18 +46,13 @@ export async function POST(request) {
       }
     });
 
-    console.log("✅ Preferencia creada con éxito. ID:", result.id);
-    
     return NextResponse.json({ 
       init_point: result.init_point,
       sandbox_init_point: result.sandbox_init_point 
     });
 
   } catch (error) {
-    console.error("❌ Error detallado en Mercado Pago:", error);
-    return NextResponse.json({ 
-      error: 'Error al crear el pago',
-      details: error.message 
-    }, { status: 500 });
+    console.error("❌ Error en Mercado Pago:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
