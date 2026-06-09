@@ -164,13 +164,6 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
     console.log("🚀 Iniciando proceso de pago...");
     
     try {
-      // 👈 PROTECCIÓN DE SANDBOX: Si el correo ingresado es del admin/desarrollador, forzamos un correo de pruebas
-      // Esto evita de inmediato la pantalla naranja por error de "autopago".
-      const emailFormulario = reserva.paciente.email.trim().toLowerCase();
-      const emailFinalParaMP = emailFormulario.includes("setting.cl") 
-        ? "test_user_123@testuser.com" 
-        : emailFormulario;
-
       const response = await fetch('/api/pagos/crear-preferencia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -180,20 +173,24 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
           reservaData: {
             profesional_id: reserva.profesional?.id,
             paciente_nombre: reserva.paciente.nombre,
-            paciente_email: emailFinalParaMP, // Envia el mail sanitizado para Sandbox
+            paciente_email: reserva.paciente.email.trim().toLowerCase(), 
             paciente_telefono: reserva.paciente.telefono,
             servicio: reserva.servicio,
             fecha: reserva.fecha,
             hora: reserva.hora,
-            notas: reserva.notas || ""
+            notas: reserva.notes || ""
           }
         })
       });
 
       const data = await response.json();
-      if (data.init_point) {
-        // Redirección de ventana completa limpia y asíncrona
-        window.location.href = data.init_point;
+      
+      // 👈 EL CAMBIO DEFINITIVO: Usamos sandbox_init_point para saltarnos los bloqueos de cookies del linter del navegador
+      const urlDestino = data.sandbox_init_point || data.init_point;
+
+      if (urlDestino) {
+        console.log("🚀 Redirigiendo a entorno de pruebas seguro:", urlDestino);
+        window.location.href = urlDestino;
       } else {
         throw new Error(data.details || "No se pudo generar la pasarela de pago");
       }
@@ -285,19 +282,17 @@ export default function FormularioReserva() {
 
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-4xl shadow-2xl border-2 border-slate-100 overflow-hidden">
-      {/* Indicador de pasos */}
       <div className="bg-slate-50/50 p-6 flex justify-between border-b">
         {PASOS.map((p) => (
           <div key={p.id} className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${pasoActual >= p.id ? "bg-blue-600 text-white border-blue-600" : "bg-white border-gray-100 text-gray-300"}`}>{p.icono}</div>
         ))}
       </div>
 
-      {/* Contenido Dinámico por Paso */}
       <div className="p-8 min-h-[550px]">
         <div className="mb-8 flex items-center justify-between">
           <h2 className="text-2xl font-black text-gray-900">{PASOS[pasoActual - 1].nombre}</h2>
           {pasoActual > 1 && (
-            <button type="button" onClick={() => setPasoActual(pasoActual - 1)} className="text-gray-400 font-bold text-xs uppercase flex items-center gap-1 hover:text-gray-600 transition-colors">
+            <button type="button" onClick={() => setPrawActual => setPasoActual(pasoActual - 1)} className="text-gray-400 font-bold text-xs uppercase flex items-center gap-1 hover:text-gray-600 transition-colors">
               <ChevronLeft size={14}/> Volver
             </button>
           )}

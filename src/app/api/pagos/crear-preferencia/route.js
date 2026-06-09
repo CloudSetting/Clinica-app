@@ -40,7 +40,7 @@ export async function POST(request) {
           hora: String(rData.hora || ""),
         },
         payer: {
-          email: "test_user_123@testuser.com", // Forzamos un mail genérico de sandbox puro
+          email: "test_user_123@testuser.com", 
           name: "Carlos",
         },
         back_urls: {
@@ -48,15 +48,17 @@ export async function POST(request) {
           failure: `${baseUrl}/reservas`,
           pending: `${baseUrl}/reservas`,
         },
-        auto_return: 'approved',
-        
-        // 👈 COMENTADO TEMPORALMENTE: Si tu webhook da error 404 o 500, Mercado Pago cancela el pago con pantalla naranja
-        // notification_url: `${baseUrl}/api/pagos/webhook`,
+        auto_return: 'approved'
       }
     });
 
     console.log("✅ Preferencia creada con éxito. ID:", result.id);
-    return NextResponse.json({ init_point: result.init_point });
+    
+    // Retornamos ambos puntos de inicio para dar flexibilidad total al desarrollo
+    return NextResponse.json({ 
+      init_point: result.init_point,
+      sandbox_init_point: result.sandbox_init_point 
+    });
 
   } catch (error) {
     console.error("❌ Error detallado en Mercado Pago:", error);
