@@ -178,14 +178,14 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
             servicio: reserva.servicio,
             fecha: reserva.fecha,
             hora: reserva.hora,
-            notas: reserva.notes || ""
+            notas: reserva.notas || ""
           }
         })
       });
 
       const data = await response.json();
       
-      // 👈 EL CAMBIO DEFINITIVO: Usamos sandbox_init_point para saltarnos los bloqueos de cookies del linter del navegador
+      // Forzar sandbox_init_point para relajar las restricciones de cookies del navegador
       const urlDestino = data.sandbox_init_point || data.init_point;
 
       if (urlDestino) {
@@ -292,7 +292,8 @@ export default function FormularioReserva() {
         <div className="mb-8 flex items-center justify-between">
           <h2 className="text-2xl font-black text-gray-900">{PASOS[pasoActual - 1].nombre}</h2>
           {pasoActual > 1 && (
-            <button type="button" onClick={() => setPrawActual => setPasoActual(pasoActual - 1)} className="text-gray-400 font-bold text-xs uppercase flex items-center gap-1 hover:text-gray-600 transition-colors">
+            /* 👈 CORREGIDO: Se eliminó el error de sintaxis que bloqueaba la compilación */
+            <button type="button" onClick={() => setPasoActual(pasoActual - 1)} className="text-gray-400 font-bold text-xs uppercase flex items-center gap-1 hover:text-gray-600 transition-colors">
               <ChevronLeft size={14}/> Volver
             </button>
           )}
