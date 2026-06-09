@@ -82,10 +82,9 @@ export default function PortalPagosAdmin() {
   const [profesionales, setProfesionales] = useState(PROFESIONALES_MOCK);
   
   // Filtros del Portal
-  const [filtroProfesional, setFiltroProfesional] = useState("p1"); // Por defecto la Dra. Ana
-  const [filtroMes, setFiltroMes] = useState(moment().format("YYYY-MM")); // Mes actual
+  const [filtroProfesional, setFiltroProfesional] = useState("p1"); 
+  const [filtroMes, setFiltroMes] = useState(moment().format("YYYY-MM")); 
 
-  // Simulación de carga asíncrona para complacer a ESLint (Listas para Supabase)
   useEffect(() => {
     async function cargarHistorico() {
       setPagos(HISTORIAL_PAGOS_MOCK);
@@ -94,14 +93,14 @@ export default function PortalPagosAdmin() {
     cargarHistorico();
   }, []);
 
-  // Motor de filtrado por Profesional y por Mes/Año seleccionado
+  // 👈 SINOPSIS: Definición unificada en masculino 'pagosFiltrados'
   const pagosFiltrados = pagos.filter((pago) => {
     const cumpleProfesional = filtroProfesional === "todos" || pago.profesional_id === filtroProfesional;
     const cumpleMes = !filtroMes || moment(pago.fecha).format("YYYY-MM") === filtroMes;
     return cumpleProfesional && cumpleMes;
   });
 
-  // Cálculos Financieros Acumulados en tiempo real
+  // Cálculos Financieros Acumulados
   const totalRecaudadoClinica = pagosFiltrados.reduce((acc, curr) => acc + curr.monto_total, 0);
   const totalNetoProfesional = pagosFiltrados.reduce((acc, curr) => acc + curr.pago_neto_medico, 0);
   const totalCitasCobradas = pagosFiltrados.length;
@@ -133,7 +132,6 @@ export default function PortalPagosAdmin() {
       {/* --- BARRA DE FILTROS (MES Y PROFESIONAL) --- */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs mb-6 flex flex-col sm:flex-row gap-4 items-end">
         <div className="w-full sm:w-72">
-          {/* 👈 CORREGIDO: Se removió 'block' para evitar conflictos con 'flex' */}
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
             <Filter size={10} /> Ver Profesional
           </label>
@@ -148,7 +146,6 @@ export default function PortalPagosAdmin() {
         </div>
 
         <div className="w-full sm:w-52">
-          {/* 👈 CORREGIDO: Se removió 'block' para evitar conflictos con 'flex' */}
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
             <Calendar size={10} /> Período Comercial
           </label>
@@ -168,7 +165,6 @@ export default function PortalPagosAdmin() {
       {/* --- TARJETAS DE PANEL DE LIQUIDACIÓN --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         
-        {/* Tarjeta 1: Lo que recibe el profesional neto */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
             <DollarSign size={22} />
@@ -180,7 +176,6 @@ export default function PortalPagosAdmin() {
           </div>
         </div>
 
-        {/* Tarjeta 2: Recaudación bruta total de las citas */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
             <TrendingUp size={22} />
@@ -192,7 +187,6 @@ export default function PortalPagosAdmin() {
           </div>
         </div>
 
-        {/* Tarjeta 3: Volumen de citas liquidadas */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
             <Users size={22} />
@@ -204,7 +198,6 @@ export default function PortalPagosAdmin() {
           </div>
         </div>
 
-        {/* Tarjeta 4: Promedio de ganancia por bloque */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
             <FileText size={22} />
@@ -238,14 +231,15 @@ export default function PortalPagosAdmin() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
-              {pagosFiltradas.length === 0 ? (
+              {/* 👈 CORREGIDO: Cambiado 'pagosFiltradas' por 'pagosFiltrados' para corregir la falla de Vercel */}
+              {pagosFiltrados.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-slate-400 font-medium">
                     No existen registros de cobros o liquidaciones para este período comercial.
                   </td>
                 </tr>
               ) : (
-                pagosFiltradas.map((pago) => (
+                pagosFiltrados.map((pago) => (
                   <tr key={pago.id} className="hover:bg-slate-50/40 transition-colors">
                     <td className="px-6 py-4 font-mono font-bold text-slate-500">{pago.id}</td>
                     <td className="px-6 py-4 text-slate-600 font-bold">
