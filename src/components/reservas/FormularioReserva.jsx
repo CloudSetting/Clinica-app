@@ -161,40 +161,29 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
   const iniciarPago = async () => {
     if (!validarForm()) return;
     setEnviando(true);
-    console.log("🚀 Iniciando proceso de simulación...");
-    
+
     try {
-      const response = await fetch('/api/pagos/crear-preferencia', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          servicio: reserva.servicio,
-          precio: 15000,
-          reservaData: {
-            profesional_id: reserva.profesional?.id,
-            paciente_nombre: reserva.paciente.nombre,
-            paciente_email: reserva.paciente.email.trim().toLowerCase(), 
-            paciente_telefono: reserva.paciente.telefono,
-            servicio: reserva.servicio,
-            fecha: reserva.fecha,
-            hora: reserva.hora,
-            notes: reserva.notas || ""
-          }
-        })
+      console.log("🚀 Redirigiendo a la pasarela simulada con los datos de la reserva...");
+
+      // Construcción limpia de query parameters con la info recolectada
+      const params = new URLSearchParams({
+        status: "approved", 
+        payment_id: "MP-SIMULADO-" + Math.floor(Math.random() * 1000000),
+        profesional_id: reserva.profesional?.id || "",
+        fecha: reserva.fecha || "",
+        hora_inicio: reserva.hora || "", 
+        paciente_nombre: reserva.paciente?.nombre || "",
+        paciente_telefono: reserva.paciente?.telefono || "",
+        paciente_email: reserva.paciente?.email || "",
+        servicio: reserva.servicio || ""
       });
 
-      const data = await response.json();
-      
-      if (data.init_point) {
-        console.log("⚠️ Bypass activado: Saltando Mercado Pago en desarrollo para avanzar rápido.");
-        // 👈 REDIRECCIÓN DIRECTA AL ÉXITO PARA EVITAR EL ACCIDENTE DE COOKIES DE MERCADO PAGO
-        window.location.href = "https://clinica-app-orpin.vercel.app/reservas/exito";
-      } else {
-        throw new Error(data.details || "No se pudo generar la pasarela de pago");
-      }
+      // Redireccionamos a la página de éxito enviando la carga útil
+      window.location.href = `/reservas/exito?${params.toString()}`;
+
     } catch (err) {
-      console.error("❌ Error API Pago:", err);
-      alert(`Error simulado: ${err.message}`);
+      console.error("❌ Error al procesar el pago simulado:", err);
+      alert("Hubo un problema al procesar la simulación del pago.");
     } finally {
       setEnviando(false);
     }
