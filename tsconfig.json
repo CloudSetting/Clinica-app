@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "src/components/reservas/FormularioReserva.jsx", "src/app/admin/Profesionales/profoesionalesTable.jsx"  ],
+, "src/components/reservas/FormularioReserva.jsx", "src/app/admin/Profesionales/profoesionalesTable.jsx", "src/app/reservas/exito/page.jsx"  ],
   "exclude": ["node_modules"]
 }
