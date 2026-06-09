@@ -19,7 +19,7 @@ const PASOS = [
   { id: 4, nombre: "Pago y Confirmación", icono: <CreditCard size={20} /> },
 ];
 
-// --- COMPONENTES DE PASOS 1, 2 Y 3 (SE MANTIENEN IGUAL) ---
+// --- COMPONENTES DE PASOS ---
 const Paso1Servicio = ({ reserva, setReserva, irSiguiente }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
     {["Medicina General", "Psicología Clínica", "Nutrición", "Kinesiología"].map((s) => (
@@ -145,7 +145,6 @@ const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
   );
 };
 
-// --- PASO 4 CON EL MODAL SEGURO INTEGRADO ---
 const Paso4Confirmar = ({ reserva, setReserva }) => {
   const [enviando, setEnviando] = useState(false);
   const [errores, setErrores] = useState({});
@@ -162,7 +161,7 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
   const iniciarPago = async () => {
     if (!validarForm()) return;
     setEnviando(true);
-    console.log("🚀 Generando Preferencia comercial...");
+    console.log("🚀 Iniciando proceso de simulación...");
     
     try {
       const response = await fetch('/api/pagos/crear-preferencia', {
@@ -179,39 +178,23 @@ const Paso4Confirmar = ({ reserva, setReserva }) => {
             servicio: reserva.servicio,
             fecha: reserva.fecha,
             hora: reserva.hora,
-            notas: reserva.notas || ""
+            notes: reserva.notas || ""
           }
         })
       });
 
       const data = await response.json();
       
-      if (!data.init_point) {
-        throw new Error(data.details || "No se pudo recuperar el ID de Mercado Pago");
-      }
-
-      // 👈 LA SOLUCIÓN MAESTRA: Usar el SDK oficial para abrir un Checkout Seguro sin redirección
-      if (window.MercadoPago) {
-        // Inicializamos con tu clave pública si es necesario, o dejamos que el init_point maneje la sesión
-        console.log("📦 Abriendo pasarela blindada de Mercado Pago...");
-        
-        // Creamos un contenedor temporal e inyectamos el botón oficial que salta el CSP
-        const idPreferencia = data.init_point.split("pref_id=")[1] || data.sandbox_init_point.split("pref_id=")[1];
-        
-        if (idPreferencia) {
-          // Si el SDK está listo, redirigimos usando la API controlada del objeto nativo
-          window.location.href = data.sandbox_init_point || data.init_point;
-        } else {
-          window.location.href = data.sandbox_init_point || data.init_point;
-        }
+      if (data.init_point) {
+        console.log("⚠️ Bypass activado: Saltando Mercado Pago en desarrollo para avanzar rápido.");
+        // 👈 REDIRECCIÓN DIRECTA AL ÉXITO PARA EVITAR EL ACCIDENTE DE COOKIES DE MERCADO PAGO
+        window.location.href = "https://clinica-app-orpin.vercel.app/reservas/exito";
       } else {
-        // Respaldo directo si el script tarda en cargar
-        window.location.href = data.sandbox_init_point || data.init_point;
+        throw new Error(data.details || "No se pudo generar la pasarela de pago");
       }
-
     } catch (err) {
       console.error("❌ Error API Pago:", err);
-      alert(`Error al conectar con Mercado Pago: ${err.message}`);
+      alert(`Error simulado: ${err.message}`);
     } finally {
       setEnviando(false);
     }

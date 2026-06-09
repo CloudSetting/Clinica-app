@@ -54,7 +54,6 @@ export async function POST(request) {
 
     console.log("✅ Preferencia creada con éxito. ID:", result.id);
     
-    // Retornamos ambos puntos de inicio para dar flexibilidad total al desarrollo
     return NextResponse.json({ 
       init_point: result.init_point,
       sandbox_init_point: result.sandbox_init_point 
