@@ -10,24 +10,26 @@ import {
   Users, 
   FileText, 
   Download,
-  Filter
+  Filter,
+  Loader2
 } from "lucide-react";
+// ⚠️ Importamos tu instancia de Supabase configurada
+import { supabase } from "@/lib/supabase";
 
-// Configurar idioma español para las fechas
 moment.locale("es");
 
-// Datos estáticos de prueba (Mock Histórico de Pagos)
+// Mock temporal de transacciones hasta que conectes la tabla de cobros
 const HISTORIAL_PAGOS_MOCK = [
   {
     id: "REC-001",
     fecha: "2026-06-08",
-    profesional_id: "p1",
+    profesional_id: "p1", // Mantenlo sincronizado con tus IDs reales para ver el cruce
     profesional_nombre: "Dra. Ana María Silva",
     paciente_nombre: "Carlos Mendoza",
     servicio: "Psicología Clínica",
     monto_total: 45000,
-    comision_clinica: 13500, // 30%
-    pago_neto_medico: 31500, // 70% para el profesional
+    comision_clinica: 13500,
+    pago_neto_medico: 31500,
     metodo_pago: "Mercado Pago (Tarjeta)",
     estado: "Liquidado"
   },
@@ -43,57 +45,54 @@ const HISTORIAL_PAGOS_MOCK = [
     pago_neto_medico: 31500,
     metodo_pago: "Mercado Pago (Efectivo)",
     estado: "Liquidado"
-  },
-  {
-    id: "REC-003",
-    fecha: "2026-05-24",
-    profesional_id: "p1",
-    profesional_nombre: "Dra. Ana María Silva",
-    paciente_nombre: "Andrés Silva",
-    servicio: "Psicología Clínica",
-    monto_total: 40000,
-    comision_clinica: 12000,
-    pago_neto_medico: 28000,
-    metodo_pago: "Transferencia",
-    estado: "Liquidado"
-  },
-  {
-    id: "REC-004",
-    fecha: "2026-06-02",
-    profesional_id: "p2",
-    profesional_nombre: "Dr. Roberto Tobar",
-    paciente_nombre: "Francisca Romo",
-    servicio: "Medicina General",
-    monto_total: 35000,
-    comision_clinica: 10500,
-    pago_neto_medico: 24500,
-    metodo_pago: "Mercado Pago (Tarjeta)",
-    estado: "Liquidado"
   }
-];
-
-const PROFESIONALES_MOCK = [
-  { id: "p1", nombre: "Dra. Ana María Silva" },
-  { id: "p2", nombre: "Dr. Roberto Tobar" }
 ];
 
 export default function PortalPagosAdmin() {
   const [pagos, setPagos] = useState(HISTORIAL_PAGOS_MOCK);
-  const [profesionales, setProfesionales] = useState(PROFESIONALES_MOCK);
+  // Inicializamos profesionales como un arreglo vacío listo para la base de datos
+  const [profesionales, setProfesionales] = useState([]);
+  const [cargandoMedicos, setCargandoMedicos] = useState(true);
   
-  // Filtros del Portal
-  const [filtroProfesional, setFiltroProfesional] = useState("p1"); 
+  // Filtros del Portal: Cambiado a "todos" por defecto para mejor experiencia de Admin
+  const [filtroProfesional, setFiltroProfesional] = useState("todos"); 
   const [filtroMes, setFiltroMes] = useState(moment().format("YYYY-MM")); 
 
   useEffect(() => {
-    async function cargarHistorico() {
-      setPagos(HISTORIAL_PAGOS_MOCK);
-      setProfesionales(PROFESIONALES_MOCK);
+    async function cargarDatosPortal() {
+      try {
+        setCargandoMedicos(true);
+        console.log("🔍 Cargando nómina de profesionales desde Supabase...");
+        
+        // Consultamos la tabla real usando la estructura exacta compartida
+        const { data, error } = await supabase
+          .from("profesionales")
+          .select("id, nombre, apellido")
+          .eq("activo", true)
+          .order("nombre", { ascending: true });
+
+        if (error) throw error;
+
+        if (data) {
+          // Transformamos el formato mapeando nombre + apellido para el selector
+          const listaFormateada = data.map(p => ({
+            id: p.id,
+            nombre: `${p.nombre} ${p.apellido}`
+          }));
+          setProfesionales(listaFormateada);
+        }
+
+      } catch (err) {
+        console.error("❌ Error al traer profesionales de Supabase:", err);
+      } finally {
+        setCargandoMedicos(false);
+      }
     }
-    cargarHistorico();
+
+    cargarDatosPortal();
   }, []);
 
-  // 👈 SINOPSIS: Definición unificada en masculino 'pagosFiltrados'
+  // Lógica de filtrado unificada
   const pagosFiltrados = pagos.filter((pago) => {
     const cumpleProfesional = filtroProfesional === "todos" || pago.profesional_id === filtroProfesional;
     const cumpleMes = !filtroMes || moment(pago.fecha).format("YYYY-MM") === filtroMes;
@@ -135,14 +134,24 @@ export default function PortalPagosAdmin() {
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
             <Filter size={10} /> Ver Profesional
           </label>
-          <select
-            value={filtroProfesional}
-            onChange={(e) => setFiltroProfesional(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
-          >
-            <option value="todos">Todos los profesionales (Vista Admin)</option>
-            {profesionales.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-          </select>
+          <div className="relative">
+            <select
+              value={filtroProfesional}
+              onChange={(e) => setFiltroProfesional(e.target.value)}
+              disabled={cargandoMedicos}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium disabled:opacity-50 appearance-none"
+            >
+              <option value="todos">Todos los profesionales (Vista Admin)</option>
+              {profesionales.map(p => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
+            </select>
+            {cargandoMedicos && (
+              <div className="absolute right-3 top-2.5">
+                <Loader2 size={12} className="animate-spin text-slate-400" />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="w-full sm:w-52">
@@ -231,7 +240,6 @@ export default function PortalPagosAdmin() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
-              {/* 👈 CORREGIDO: Cambiado 'pagosFiltradas' por 'pagosFiltrados' para corregir la falla de Vercel */}
               {pagosFiltrados.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-slate-400 font-medium">
