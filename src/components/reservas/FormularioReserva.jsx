@@ -74,14 +74,28 @@ const Paso3FechaHora = ({ reserva, setReserva, irSiguiente }) => {
   const [bloquesOcupados, setBloquesOcupados] = useState([]);
   const [cargandoHoras, setCargandoHoras] = useState(false);
 
-  const fetchDispo = useCallback(async () => {
-    if (!reserva.fecha || !reserva.profesional) return;
-    setCargandoHoras(true);
-    try {
-      const { data } = await supabase.from("reservas").select("hora").eq("profesional_id", reserva.profesional.id).eq("fecha", reserva.fecha).neq("estado", "cancelada");
-      setBloquesOcupados(data ? data.map(r => r.hora.substring(0, 5)) : []);
-    } catch (err) { console.error(err); } finally { setCargandoHoras(false); }
-  }, [reserva.fecha, reserva.profesional]);
+ const fetchDispo = useCallback(async () => {
+  if (!reserva.fecha || !reserva.profesional) return;
+  setCargandoHoras(true);
+  try {
+    // 👈 CAMBIO CLAVE: Cambiamos "hora" por "hora_inicio" para coincidir con tu tabla de Supabase
+    const { data } = await supabase
+      .from("reservas")
+      .select("hora_inicio") 
+      .eq("profesional_id", reserva.profesional.id)
+      .eq("fecha", reserva.fecha)
+      .neq("estado", "cancelada");
+      
+    // Mapeamos de forma segura leyendo 'hora_inicio' y cortando los segundos
+    setBloquesOcupados(
+      data ? data.map(r => r.hora_inicio ? r.hora_inicio.substring(0, 5) : "") : []
+    );
+  } catch (err) { 
+    console.error("Error al obtener disponibilidad:", err); 
+  } finally { 
+    setCargandoHoras(false); 
+  }
+}, [reserva.fecha, reserva.profesional]);
 
   useEffect(() => { fetchDispo(); }, [fetchDispo]);
 
