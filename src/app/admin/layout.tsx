@@ -1,89 +1,80 @@
 "use client";
 
 import React from "react";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { usePathname } from "next/navigation"; // 👈 Opcional pero recomendado para marcar el botón activo
 import { 
   LayoutDashboard, 
   Users, 
-  Calendar, 
-  Clock
+  CalendarDays, 
+  Clock, 
+  DollarSign 
 } from "lucide-react";
-import LogoutButton from "@/components/LogoutButton";
 
-// Definimos la estructura exacta de cada botón del menú para complacer a TypeScript
-interface MenuItem {
-  name: string;
-  href: string;
-  icon: React.ReactNode;
+interface AdminLayoutProps {
+  children: React.ReactNode;
 }
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const pathname = usePathname(); // Captura en qué página está el administrador
+export default function AdminLayout({ children }: AdminLayoutProps) {
+  const pathname = usePathname();
 
-  const menuItems: MenuItem[] = [
-    { name: "Dashboard", href: "/admin/dashboard", icon: <LayoutDashboard size={20} /> },
-    { name: "Profesionales", href: "/admin/profesionales", icon: <Users size={20} /> },
-    { name: "Reservas", href: "/admin/reservas", icon: <Calendar size={20} /> },
-    { name: "Horarios", href: "/admin/horarios", icon: <Clock size={20} /> },
+  // 🚀 DETECTOR DE LOGIN: Si la ruta es exactamente el login, quitamos el Sidebar
+  const esLogin = pathname === "/admin/login";
+
+  if (esLogin) {
+    return <div className="w-full min-h-screen bg-slate-900">{children}</div>;
+  }
+
+  // Menú de navegación lateral original
+  const enlaces = [
+    { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+    { name: "Profesionales", href: "/admin/profesionales", icon: Users },
+    { name: "Reservas", href: "/admin/reservas", icon: CalendarDays },
+    { name: "Horarios", href: "/admin/horarios", icon: Clock },
+    { name: "Pagos", href: "/admin/pagos", icon: DollarSign },
   ];
 
   return (
-    <div className="flex min-h-screen bg-slate-50 text-slate-800">
+    <div className="flex min-h-screen bg-slate-50 text-slate-800 font-sans">
       
-      {/* Sidebar Fija (Escritorio) */}
-      <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col shrink-0">
-        <div className="p-6">
-          <div className="bg-blue-600 text-white font-black text-sm py-2 px-4 rounded-xl inline-block tracking-tight">
-            Centro Médico
+      {/* 1. Barra Lateral Administrativa Izquierda */}
+      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-30">
+        <div className="p-5 border-b border-slate-100 flex items-center gap-2">
+          <div className="bg-blue-600 text-white font-black px-2.5 py-1 rounded-xl text-xs uppercase tracking-wider">
+            CM
           </div>
+          <span className="font-black text-slate-900 tracking-tight text-sm">Centro Médico</span>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1">
-          {menuItems.map((item) => {
-            // Evaluamos si el administrador se encuentra actualmente en este módulo
-            const esActivo = pathname === item.href;
+        <nav className="flex-1 p-4 space-y-1.5 text-xs font-semibold">
+          {enlaces.map((enlace) => {
+            const Icono = enlace.icon;
+            const activo = pathname === enlace.href;
 
             return (
               <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-xs uppercase tracking-wider ${
-                  esActivo 
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-100" 
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                key={enlace.href}
+                href={enlace.href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all uppercase tracking-wider font-black ${
+                  activo
+                    ? "bg-blue-50 text-blue-600 shadow-xs"
+                    : "text-slate-400 hover:text-slate-900 hover:bg-slate-50"
                 }`}
               >
-                {item.icon}
-                {item.name}
+                <Icono size={16} />
+                {enlace.name}
               </Link>
             );
           })}
         </nav>
-
-        {/* Botón de Salir al final */}
-        <div className="p-4 border-t border-slate-100">
-          <LogoutButton />
-        </div>
       </aside>
 
-      {/* Contenido Principal */}
-      <main className="flex-1 flex flex-col min-w-0">
-        {/* Header Superior (Solo visible en dispositivos móviles) */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 md:hidden shrink-0">
-          <span className="font-black text-blue-600 text-sm tracking-tight">CM Admin</span>
-          {/* Aquí puedes incorporar un menú móvil desplegable en el futuro */}
-        </header>
-
-        {/* Área de Renderizado de Páginas */}
-        <div className="p-6 md:p-8 flex-1 overflow-y-auto">
+      {/* 2. Contenedor de las páginas internas con margen izquierdo para no taparse */}
+      <div className="flex-1 pl-64">
+        <main className="p-8">
           {children}
-        </div>
-      </main>
+        </main>
+      </div>
 
     </div>
   );
