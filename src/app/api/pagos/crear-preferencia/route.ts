@@ -19,7 +19,6 @@ export async function POST(request: Request) {
       body: {
         items: [
           {
-            // 🚀 CORREGIDO: Agregamos el 'id' obligatorio exigido por el tipo 'Items' del SDK
             id: 'atencion-medica-id', 
             title: String(bodyData.servicio || "Atención Médica"),
             quantity: 1,
@@ -42,7 +41,6 @@ export async function POST(request: Request) {
     });
 
   } catch (error) {
-    // 🚀 CORREGIDO: Tratamiento seguro del error sin usar explicit 'any'
     const mensajeError = error instanceof Error ? error.message : "Error desconocido en Mercado Pago";
     console.error("❌ Error en Mercado Pago:", error);
     return NextResponse.json({ error: mensajeError }, { status: 500 });
