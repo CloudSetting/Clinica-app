@@ -10,7 +10,8 @@ import {
   X, 
   Loader2,
   List,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Eye
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -18,11 +19,11 @@ moment.locale("es");
 const localizer = momentLocalizer(moment);
 
 const COLORES_ESTADOS = {
-  confirmada: { bg: "#e6f4ea", text: "#137333", border: "#137333" },
-  con_pago: { bg: "#e6f4ea", text: "#137333", border: "#137333" },
-  pendiente: { bg: "#fef7e0", text: "#b06000", border: "#b06000" },
-  cancelada: { bg: "#fce8e6", text: "#c5221f", border: "#c5221f" },
-  completada: { bg: "#e8f0fe", text: "#1a73e8", border: "#1a73e8" }
+  confirmada: { bg: "#e6f4ea", text: "#137333", border: "#137333", badge: "bg-green-50 text-green-700 border-green-200" },
+  con_pago: { bg: "#e6f4ea", text: "#137333", border: "#137333", badge: "bg-green-50 text-green-700 border-green-200" },
+  pendiente: { bg: "#fef7e0", text: "#b06000", border: "#b06000", badge: "bg-amber-50 text-amber-700 border-amber-200" },
+  cancelada: { bg: "#fce8e6", text: "#c5221f", border: "#c5221f", badge: "bg-red-50 text-red-700 border-red-200" },
+  completada: { bg: "#e8f0fe", text: "#1a73e8", border: "#1a73e8", badge: "bg-blue-50 text-blue-700 border-blue-200" }
 };
 
 export default function PanelReservas() {
@@ -47,7 +48,7 @@ export default function PanelReservas() {
 
       const { data: medicos, error: errMedicos } = await supabase
         .from("profesionales")
-        .select("id, nombre, apellido");
+        .select("id, font:nombre, apellido");
       
       if (errMedicos) throw errMedicos;
       if (medicos) setProfesionales(medicos);
@@ -160,7 +161,7 @@ export default function PanelReservas() {
           <button 
             type="button" 
             onClick={() => setVistaActual("lista")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${vistaActual === "lista" ? "bg-slate-100 text-slate-900" : "text-slate-400 hover:text-slate-600"}`}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${vistaActual === "lista" ? "bg-blue-600 text-white shadow-xs" : "text-slate-400 hover:text-slate-600"}`}
           >
             <List size={14} /> Lista
           </button>
@@ -176,7 +177,6 @@ export default function PanelReservas() {
 
       {/* Filtros Superiores */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
         <div>
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">
             Médico / Profesional
@@ -229,31 +229,94 @@ export default function PanelReservas() {
             className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none"
           />
         </div>
-
       </div>
 
-      {/* Calendario */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-162.5">
-        <Calendar
-          localizer={localizer}
-          events={eventosFiltrados}
-          startAccessor="start"
-          endAccessor="end"
-          eventPropGetter={eventStyleGetter}
-          onSelectEvent={(evento) => {
-            setReservaSeleccionada(evento.resource);
-            setVerDetalleModal(true);
-          }}
-          messages={{
-            next: "Siguiente",
-            previous: "Anterior",
-            today: "Hoy",
-            month: "Mes",
-            week: "Semana",
-            day: "Día",
-          }}
-        />
-      </div>
+      {/* Render Condicional de Vistas */}
+      {vistaActual === "calendario" ? (
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm h-162.5">
+          <Calendar
+            localizer={localizer}
+            events={eventosFiltrados}
+            startAccessor="start"
+            endAccessor="end"
+            eventPropGetter={eventStyleGetter}
+            onSelectEvent={(evento) => {
+              setReservaSeleccionada(evento.resource);
+              setVerDetalleModal(true);
+            }}
+            messages={{
+              next: "Siguiente",
+              previous: "Anterior",
+              today: "Hoy",
+              month: "Mes",
+              week: "Semana",
+              day: "Día",
+            }}
+          />
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                  <th className="px-6 py-4">Fecha / Hora</th>
+                  <th className="px-6 py-4">Paciente</th>
+                  <th className="px-6 py-4">Servicio</th>
+                  <th className="px-6 py-4">Especialista</th>
+                  <th className="px-6 py-4">Método Pago</th>
+                  <th className="px-6 py-4 text-center">Estado</th>
+                  <th className="px-6 py-4 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs font-medium">
+                {eventosFiltrados.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-12 text-slate-400 italic">
+                      No se encontraron registros que coincidan con los filtros seleccionados.
+                    </td>
+                  </tr>
+                ) : (
+                  eventosFiltrados.map((evento) => {
+                    const res = evento.resource;
+                    const estilo = COLORES_ESTADOS[res.estado || "pendiente"] || COLORES_ESTADOS.pendiente;
+                    
+                    return (
+                      <tr key={res.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-slate-900">{res.fecha}</p>
+                          <p className="text-[10px] text-slate-400">{res.hora_inicio?.substring(0, 5)} - {res.hora_fin?.substring(0, 5)} hrs</p>
+                        </td>
+                        <td className="px-6 py-4 font-bold text-slate-800">{res.paciente_nombre}</td>
+                        <td className="px-6 py-4 text-slate-600">{res.servicio}</td>
+                        <td className="px-6 py-4 text-blue-600 font-bold">{res.medico_nombre}</td>
+                        <td className="px-6 py-4 capitalize text-slate-400 text-[11px]">{res.tipo_pago || "Mercado Pago"}</td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-black uppercase tracking-wide ${estilo.badge}`}>
+                            {res.estado || "Pendiente"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReservaSeleccionada(res);
+                              setVerDetalleModal(true);
+                            }}
+                            className="p-2 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-xl transition-colors shadow-xs"
+                          >
+                            <Eye size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Modal Acciones */}
       {verDetalleModal && reservaSeleccionada && (
