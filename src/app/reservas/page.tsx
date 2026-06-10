@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Stethoscope, Loader2, User, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Stethoscope, Loader2, User, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -42,6 +42,11 @@ export default function ReservaPublica() {
   const [profesionalSeleccionado, setProfesionalSeleccionado] = useState<string | null>(null);
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>("");
   const [horaSeleccionada, setHoraSeleccionada] = useState<string | null>(null);
+  
+  // Datos dinámicos del Paciente (Paso 4)
+  const [pacienteNombre, setPacienteNombre] = useState<string>("");
+  const [pacienteEmail, setPacienteEmail] = useState<string>("");
+  const [pacienteTelefono, setPacienteTelefono] = useState<string>("");
   
   // Estados para la navegación del calendario custom
   const [mesActual, setMesActual] = useState<Date>(new Date());
@@ -120,7 +125,7 @@ export default function ReservaPublica() {
   }, [servicioIdSeleccionado, paso]);
 
   // ==========================================
-  // 📥 EFECTO 3: Calcular Disponibilidad
+  // 📥 EFECTO 3: Calcular Disponibilidad Horaria
   // ==========================================
   useEffect(() => {
     async function obtenerHorasDisponibles() {
@@ -172,11 +177,11 @@ export default function ReservaPublica() {
       }
     }
 
-    function generarBloquesPorDefecto() {
-      const horasEstandar = ["09:00", "10:00", "11:00", "12:00", "15:00", "16:00", "17:00"];
-      setHorasDisponibles(horasEstandar.map(h => ({ hora: h, disponible: true })));
-    }
-
+  function generarBloquesPorDefecto() {
+  const horasEstandar = ["09:00", "10:00", "11:00", "12:00", "15:00", "16:00", "17:00"];
+  // 🚀 CORREGIDO: Cambiamos 'h' por 'hora: h' para cumplir con la interfaz HorarioDisponible
+  setHorasDisponibles(horasEstandar.map(h => ({ hora: h, disponible: true })));
+}
     if (paso === 3) {
       obtenerHorasDisponibles();
     }
@@ -204,14 +209,16 @@ export default function ReservaPublica() {
   const diasSemana = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
   // ==========================================
-  // 🚀 FLUJO MERCADO PAGO RUTA CORREGIDA
+  // 🚀 ENLACE CON MERCADO PAGO API
   // ==========================================
-  const iniciarFlujoPagoMercadoPago = async () => {
+  const iniciarFlujoPagoMercadoPago = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     try {
       setProcesandoPago(true);
 
-      if (!servicioIdSeleccionado || !profesionalSeleccionado || !fechaSeleccionada || !horaSeleccionada) {
-        alert("Faltan datos clave de la reserva.");
+      if (!pacienteNombre || !pacienteEmail || !pacienteTelefono) {
+        alert("Por favor rellena todos los campos requeridos.");
         setProcesandoPago(false);
         return;
       }
@@ -221,12 +228,11 @@ export default function ReservaPublica() {
         servicio: String(servicioNombreSeleccionado || "Consulta Médica"),
         fecha: String(fechaSeleccionada),
         hora_inicio: `${horaSeleccionada}:00`,
-        paciente_nombre: "Paciente Web",
-        paciente_email: "correo@temporal.cl",
-        paciente_telefono: "+56900000000"
+        paciente_nombre: String(pacienteNombre),
+        paciente_email: String(pacienteEmail),
+        paciente_telefono: String(pacienteTelefono)
       }).toString();
 
-      // 🚀 CORREGIDO: Apuntando exactamente a /crear-preferencia (en español)
       const respuesta = await fetch("/api/pagos/crear-preferencia", {
         method: "POST",
         headers: { 
@@ -279,6 +285,8 @@ export default function ReservaPublica() {
       setHoraSeleccionada(null);
       setFechaSeleccionada("");
       setPaso(2);
+    } else if (paso === 4) {
+      setPaso(3);
     } else {
       router.push("/");
     }
@@ -301,23 +309,32 @@ export default function ReservaPublica() {
             <ArrowLeft size={14} /> Volver
           </button>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4 sm:gap-6">
             <div className={`p-2 rounded-xl text-white transition-all ${paso === 1 ? "bg-blue-600 shadow-sm" : "bg-emerald-600"}`}>
-              <Stethoscope size={16} />
+              <Stethoscope size={15} />
             </div>
-            <div className={`w-4 h-0.5 ${paso >= 2 ? "bg-emerald-600" : "bg-slate-200"}`} />
+            <div className={`w-3 h-0.5 ${paso >= 2 ? "bg-emerald-600" : "bg-slate-200"}`} />
+            
             <div className={`p-2 rounded-xl text-white transition-all ${paso === 2 ? "bg-blue-600 shadow-sm" : paso > 2 ? "bg-emerald-600" : "bg-slate-200 text-slate-400"}`}>
-              <User size={16} />
+              <User size={15} />
             </div>
-            <div className={`w-4 h-0.5 ${paso >= 3 ? "bg-emerald-600" : "bg-slate-200"}`} />
-            <div className={`p-2 rounded-xl text-white transition-all ${paso === 3 ? "bg-blue-600 shadow-sm" : "bg-slate-200 text-slate-400"}`}>
-              <CalendarDays size={16} />
+            <div className={`w-3 h-0.5 ${paso >= 3 ? "bg-emerald-600" : "bg-slate-200"}`} />
+            
+            <div className={`p-2 rounded-xl text-white transition-all ${paso === 3 ? "bg-blue-600 shadow-sm" : paso > 3 ? "bg-emerald-600" : "bg-slate-200 text-slate-400"}`}>
+              <CalendarDays size={15} />
+            </div>
+            <div className={`w-3 h-0.5 ${paso >= 4 ? "bg-emerald-600" : "bg-slate-200"}`} />
+
+            {/* 🚀 CORREGIDO: Usando ClipboardCheck exportado nativamente */}
+            <div className={`p-2 rounded-xl text-white transition-all ${paso === 4 ? "bg-blue-600 shadow-sm" : "bg-slate-200 text-slate-400"}`}>
+              <ClipboardCheck size={15} />
             </div>
           </div>
           <div className="w-16 hidden sm:block" />
         </div>
 
         <div className="p-6 md:p-8">
+          {/* PASO 1: SELECCIÓN DE SERVICIO */}
           {paso === 1 && (
             <>
               <h2 className="text-base font-black text-slate-900 uppercase tracking-wider mb-6">Selecciona el Servicio</h2>
@@ -358,6 +375,7 @@ export default function ReservaPublica() {
             </>
           )}
 
+          {/* PASO 2: SELECCIÓN DE PROFESIONAL */}
           {paso === 2 && (
             <>
               <div className="mb-6">
@@ -411,6 +429,7 @@ export default function ReservaPublica() {
             </>
           )}
 
+          {/* PASO 3: SELECCIÓN DE FECHA Y HORAS */}
           {paso === 3 && (
             <div className="space-y-6 animate-fade-in">
               <div>
@@ -488,17 +507,82 @@ export default function ReservaPublica() {
               {horaSeleccionada && (
                 <div className="pt-4 border-t border-slate-100 flex justify-end">
                   <button
-                    key="btn-confirmar-pago"
                     type="button"
-                    disabled={procesandoPago}
-                    onClick={iniciarFlujoPagoMercadoPago}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md flex items-center gap-2"
+                    onClick={() => setPaso(4)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md"
                   >
-                    {procesandoPago ? <><Loader2 className="animate-spin" size={14} /> Conectando con Mercado Pago...</> : "Confirmar y Continuar a Pago"}
+                    Ingresar mis datos
                   </button>
                 </div>
               )}
             </div>
+          )}
+
+          {/* PASO 4: FORMULARIO DE INFORMACIÓN PERSONAL */}
+          {paso === 4 && (
+            <form onSubmit={iniciarFlujoPagoMercadoPago} className="space-y-6 animate-fade-in">
+              <div>
+                <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">Datos del Paciente</h2>
+                <p className="text-xs text-slate-400 mt-1 font-medium">Por favor ingresa la información de quien asistirá a la cita médica.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider">Nombre Completo *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Juan Carlos Pérez"
+                    value={pacienteNombre}
+                    onChange={(e) => setPacienteNombre(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:border-blue-600 focus:outline-none transition-colors font-medium"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider">Teléfono de Contacto *</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="Ej. +56912345678"
+                    value={pacienteTelefono}
+                    onChange={(e) => setPacienteTelefono(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:border-blue-600 focus:outline-none transition-colors font-medium"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider">Correo Electrónico *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="Ej. juan.perez@email.com"
+                    value={pacienteEmail}
+                    onChange={(e) => setPacienteEmail(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:border-blue-600 focus:outline-none transition-colors font-medium"
+                  />
+                  <p className="text-[10px] text-slate-400 font-medium">A esta dirección enviaremos el comprobante de pago y el link de atención.</p>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex justify-end">
+                <button
+                  key="btn-confirmar-pago"
+                  type="submit"
+                  disabled={procesandoPago}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md flex items-center gap-2"
+                >
+                  {procesandoPago ? (
+                    <>
+                      <Loader2 className="animate-spin" size={14} />
+                      Conectando con Mercado Pago...
+                    </>
+                  ) : (
+                    "Confirmar y Continuar a Pago"
+                  )}
+                </button>
+              </div>
+            </form>
           )}
         </div>
       </div>
