@@ -46,14 +46,17 @@ export default function ReservaPublica() {
   // Estados para la navegación del calendario custom
   const [mesActual, setMesActual] = useState<Date>(new Date());
   
-  // Estados de carga
+  // Estados de carga (Loaders)
   const [cargandoServicios, setCargandoServicios] = useState<boolean>(true);
   const [cargandoProfesionales, setCargandoProfesionales] = useState<boolean>(false);
   const [cargandoHoras, setCargandoHoras] = useState<boolean>(false);
+  const [procesandoPago, setProcesandoPago] = useState<boolean>(false);
   
   const [paso, setPaso] = useState<number>(1);
 
-  // 1. Cargar servicios
+  // ==========================================
+  // 📥 EFECTO 1: Cargar Servicios Iniciales
+  // ==========================================
   useEffect(() => {
     async function obtenerServicios() {
       try {
@@ -74,7 +77,9 @@ export default function ReservaPublica() {
     obtenerServicios();
   }, []);
 
-  // 2. Filtrar profesionales
+  // ==========================================
+  // 📥 EFECTO 2: Filtrar Profesionales (Tabla Intermedia)
+  // ==========================================
   useEffect(() => {
     async function obtenerProfesionalesPorServicio() {
       if (!servicioIdSeleccionado) return;
@@ -114,7 +119,9 @@ export default function ReservaPublica() {
     }
   }, [servicioIdSeleccionado, paso]);
 
-  // 3. Calcular disponibilidad horaria real
+  // ==========================================
+  // 📥 EFECTO 3: Calcular Disponibilidad Horaria Real
+  // ==========================================
   useEffect(() => {
     async function obtenerHorasDisponibles() {
       if (!profesionalSeleccionado || !fechaSeleccionada) return;
@@ -206,7 +213,55 @@ export default function ReservaPublica() {
   const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
   const diasSemana = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
-  // --- CONTROLADORES DE FLUJO ---
+  // ==========================================
+  // 🚀 LOGICA DE ENLACE CON MERCADO PAGO API
+  // ==========================================
+  const iniciarFlujoPagoMercadoPago = async () => {
+    try {
+      setProcesandoPago(true);
+
+      const pacienteNombre = "Paciente Web";
+      const pacienteEmail = "correo@temporal.cl";
+      const pacienteTelefono = "+56900000000";
+
+      // Reconstruimos el string queryRedirect idéntico a como lo espera tu página de éxito externa
+      const queryRedirect = new URLSearchParams({
+        profesional_id: profesionalSeleccionado || "",
+        servicio: servicioNombreSeleccionado || "Consulta Médica",
+        fecha: fechaSeleccionada,
+        hora_inicio: `${horaSeleccionada}:00`,
+        paciente_nombre: pacienteNombre,
+        paciente_email: pacienteEmail,
+        paciente_telefono: pacienteTelefono
+      }).toString();
+
+      // Apuntamos a tu endpoint existente
+      const respuesta = await fetch("/api/pagos/crear-preference", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          servicio: servicioNombreSeleccionado,
+          precio: 15000, 
+          queryRedirect: queryRedirect 
+        }),
+      });
+
+      const data = await respuesta.json();
+
+      if (data.sandbox_init_point || data.init_point) {
+        window.location.href = data.sandbox_init_point || data.init_point;
+      } else {
+        alert("Error al inicializar la pasarela: " + (data.error || "Desconocido"));
+      }
+    } catch (err) {
+      console.error("❌ Error conectando con tu endpoint de pagos:", err);
+      alert("Hubo un problema de conexión al procesar el checkout.");
+    } finally {
+      setProcesandoPago(false);
+    }
+  };
+
+  // --- CONTROLADORES DE REGRESO ---
   const seleccionarServicioYAvanzar = (idServicio: string, nombreServicio: string) => {
     setServicioIdSeleccionado(idServicio);
     setServicioNombreSeleccionado(nombreServicio);
@@ -427,10 +482,6 @@ export default function ReservaPublica() {
                           key={formatoStr}
                           type="button"
                           disabled={esPasado}
-                          onClick={() => {
-                            setFechaSeleccionada(formatoStr);
-                            setHoraSeleccionada(null);
-                          }}
                           className={`aspect-square rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center relative ${
                             esPasado
                               ? "bg-slate-50 text-slate-300 border-transparent cursor-not-allowed"
@@ -438,6 +489,10 @@ export default function ReservaPublica() {
                               ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100 font-black scale-105"
                               : "bg-white text-slate-800 border-slate-100 hover:border-slate-300 active:scale-95 shadow-xs"
                           }`}
+                          onClick={() => {
+                            setFechaSeleccionada(formatoStr);
+                            setHoraSeleccionada(null);
+                          }}
                         >
                           {fecha.getDate()}
                         </button>
@@ -488,11 +543,20 @@ export default function ReservaPublica() {
               {horaSeleccionada && (
                 <div className="pt-4 border-t border-slate-100 flex justify-end">
                   <button
+                    key="btn-confirmar-pago"
                     type="button"
-                    onClick={() => alert(`🎉 Turno pre-reservado con éxito para el ${fechaSeleccionada} a las ${horaSeleccionada} hrs.`)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-95"
+                    disabled={procesandoPago}
+                    onClick={iniciarFlujoPagoMercadoPago}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2"
                   >
-                    Confirmar y Continuar a Pago
+                    {procesandoPago ? (
+                      <>
+                        <Loader2 className="animate-spin" size={14} />
+                        Conectando con Mercado Pago...
+                      </>
+                    ) : (
+                      "Confirmar y Continuar a Pago"
+                    )}
                   </button>
                 </div>
               )}
