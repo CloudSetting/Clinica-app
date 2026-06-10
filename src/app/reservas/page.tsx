@@ -14,19 +14,19 @@ interface Servicio {
 export default function ReservaPublica() {
   const router = useRouter();
   const [servicios, setServicios] = useState<Servicio[]>([]);
+  
+  // 🚀 CORREGIDO: Inicializamos el estado para almacenar el 'nombre' del servicio seleccionado
   const [servicioSeleccionado, setServicioSeleccionado] = useState<string | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
-
-  // Paso actual del formulario multi-step (por si manejas más pasos adelante)
   const [paso, setPaso] = useState<number>(1);
 
-  // 🚀 1. CARGA DINÁMICA DESDE SUPABASE (Trae Kinesiología, Psiquiatría, Nutrición Deportiva, etc.)
+  // Carga dinámica desde Supabase
   useEffect(() => {
     async function obtenerServicios() {
       try {
         setCargando(true);
         const { data, error } = await supabase
-          .from("servicios") // Nombre exacto de tu tabla de especialidades
+          .from("servicios")
           .select("id, nombre, descripcion")
           .order("nombre", { ascending: true });
 
@@ -41,12 +41,10 @@ export default function ReservaPublica() {
     obtenerServicios();
   }, []);
 
-  // Función para el botón de regresar
   const manejarVolverAtras = () => {
     if (paso > 1) {
       setPaso(paso - 1);
     } else {
-      // 🚀 Si está en el paso 1, lo saca del flujo y lo manda a la Landing Page principal
       router.push("/"); 
     }
   };
@@ -65,8 +63,6 @@ export default function ReservaPublica() {
         
         {/* Barra superior de pasos e íconos */}
         <div className="p-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between px-6">
-          
-          {/* 👇 BOTÓN VOLVER ATRÁS INCORPORADO */}
           <button
             type="button"
             onClick={manejarVolverAtras}
@@ -76,7 +72,6 @@ export default function ReservaPublica() {
             Volver
           </button>
 
-          {/* Indicadores visuales de progreso */}
           <div className="flex items-center gap-6">
             <div className={`p-2 rounded-xl text-white ${paso >= 1 ? "bg-blue-600 shadow-sm shadow-blue-100" : "bg-slate-200"}`}>
               <Stethoscope size={16} />
@@ -87,7 +82,6 @@ export default function ReservaPublica() {
             <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-400">3</div>
           </div>
 
-          {/* Espaciador invisible para balancear el layout */}
           <div className="w-16 hidden sm:block" />
         </div>
 
@@ -105,15 +99,18 @@ export default function ReservaPublica() {
               No hay especialidades cargadas en el sistema en este momento.
             </div>
           ) : (
-            /* 👇 GRID MAPEADO DINÁMICAMENTE CON TODOS LOS REGISTROS DE LA BD */
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {servicios.map((servicio) => {
-                const seleccionado = servicioSeleccionado === servicio.id;
+                
+                // 🚀 CORREGIDO: Evaluamos la selección por el NOMBRE del servicio para activar los estilos CSS nativos
+                const seleccionado = servicioSeleccionado === servicio.nombre;
+
                 return (
                   <button
                     key={servicio.id}
                     type="button"
-                    onClick={() => setServicioSeleccionado(servicio.id)}
+                    // 🚀 CORREGIDO: Al hacer clic, guardamos el nombre del servicio
+                    onClick={() => setServicioSeleccionado(servicio.nombre)}
                     className={`p-6 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between group active:scale-98 ${
                       seleccionado
                         ? "border-blue-600 bg-blue-50/30 ring-4 ring-blue-50"
