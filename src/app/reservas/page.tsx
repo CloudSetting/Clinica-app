@@ -47,6 +47,8 @@ export default function ReservaPublica() {
   const [pacienteNombre, setPacienteNombre] = useState<string>("");
   const [pacienteEmail, setPacienteEmail] = useState<string>("");
   const [pacienteTelefono, setPacienteTelefono] = useState<string>("");
+  // 🚀 NUEVO ESTADO: Información adicional (Opcional)
+  const [pacienteNotas, setPacienteNotas] = useState<string>("");
   
   // Estados para la navegación del calendario custom
   const [mesActual, setMesActual] = useState<Date>(new Date());
@@ -91,7 +93,7 @@ export default function ReservaPublica() {
 
       try {
         setCargandoProfesionales(true);
-        const { data, error } = await supabase
+        const { data, error = null } = await supabase
           .from("profesional_servicio")
           .select(`
             profesionales (
@@ -177,11 +179,11 @@ export default function ReservaPublica() {
       }
     }
 
-  function generarBloquesPorDefecto() {
-  const horasEstandar = ["09:00", "10:00", "11:00", "12:00", "15:00", "16:00", "17:00"];
-  // 🚀 CORREGIDO: Cambiamos 'h' por 'hora: h' para cumplir con la interfaz HorarioDisponible
-  setHorasDisponibles(horasEstandar.map(h => ({ hora: h, disponible: true })));
-}
+    function generarBloquesPorDefecto() {
+      const horasEstandar = ["09:00", "10:00", "11:00", "12:00", "15:00", "16:00", "17:00"];
+      setHorasDisponibles(horasEstandar.map(h => ({ hora: h, disponible: true })));
+    }
+
     if (paso === 3) {
       obtenerHorasDisponibles();
     }
@@ -209,7 +211,7 @@ export default function ReservaPublica() {
   const diasSemana = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
   // ==========================================
-  // 🚀 ENLACE CON MERCADO PAGO API
+  // 🚀 ENLACE MERCADO PAGO ACTUALIZADO
   // ==========================================
   const iniciarFlujoPagoMercadoPago = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -230,7 +232,9 @@ export default function ReservaPublica() {
         hora_inicio: `${horaSeleccionada}:00`,
         paciente_nombre: String(pacienteNombre),
         paciente_email: String(pacienteEmail),
-        paciente_telefono: String(pacienteTelefono)
+        paciente_telefono: String(pacienteTelefono),
+        // 🚀 ENVIADO: Mandamos las notas limpias en el string relacional
+        informacion_adicional: String(pacienteNotas).trim() 
       }).toString();
 
       const respuesta = await fetch("/api/pagos/crear-preferencia", {
@@ -325,7 +329,6 @@ export default function ReservaPublica() {
             </div>
             <div className={`w-3 h-0.5 ${paso >= 4 ? "bg-emerald-600" : "bg-slate-200"}`} />
 
-            {/* 🚀 CORREGIDO: Usando ClipboardCheck exportado nativamente */}
             <div className={`p-2 rounded-xl text-white transition-all ${paso === 4 ? "bg-blue-600 shadow-sm" : "bg-slate-200 text-slate-400"}`}>
               <ClipboardCheck size={15} />
             </div>
@@ -518,7 +521,7 @@ export default function ReservaPublica() {
             </div>
           )}
 
-          {/* PASO 4: FORMULARIO DE INFORMACIÓN PERSONAL */}
+          {/* PASO 4: FORMULARIO DE INFORMACIÓN PERSONAL (CON NOTAS ADICIONALES) */}
           {paso === 4 && (
             <form onSubmit={iniciarFlujoPagoMercadoPago} className="space-y-6 animate-fade-in">
               <div>
@@ -562,6 +565,21 @@ export default function ReservaPublica() {
                     className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:border-blue-600 focus:outline-none transition-colors font-medium"
                   />
                   <p className="text-[10px] text-slate-400 font-medium">A esta dirección enviaremos el comprobante de pago y el link de atención.</p>
+                </div>
+
+                {/* 🚀 NUEVO INPUT: Área de Notas / Información Adicional Opcional */}
+                <div className="flex flex-col gap-1.5 md:col-span-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs font-black text-slate-700 uppercase tracking-wider">Información Adicional</label>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Opcional</span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    placeholder="Ej. Indicar si posee alergias médicas, síntomas previos, patologías crónicas o el motivo de la consulta."
+                    value={pacienteNotas}
+                    onChange={(e) => setPacienteNotas(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm text-slate-800 focus:border-blue-600 focus:outline-none transition-colors font-medium resize-none"
+                  />
                 </div>
               </div>
 
