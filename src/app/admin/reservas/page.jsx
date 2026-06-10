@@ -46,13 +46,23 @@ export default function PanelReservas() {
     try {
       setCargando(true);
 
+      // 1. Traer profesionales (CORREGIDO: select limpio sin 'font:')
       const { data: medicos, error: errMedicos } = await supabase
         .from("profesionales")
-        .select("id, font:nombre, apellido");
+        .select("id, nombre, apellido");
       
       if (errMedicos) throw errMedicos;
-      if (medicos) setProfesionales(medicos);
 
+      let listaMedicos = [];
+      if (medicos) {
+        listaMedicos = medicos.map(p => ({
+          id: p.id,
+          nombre: `${p.nombre || ""} ${p.apellido || ""}`.trim() || "Especialista Sin Nombre"
+        }));
+        setProfesionales(listaMedicos);
+      }
+
+      // 2. Traer reservas
       const { data: citas, error: errCitas } = await supabase
         .from("reservas")
         .select("*");
@@ -64,12 +74,13 @@ export default function PanelReservas() {
           const start = new Date(`${c.fecha}T${c.hora_inicio || "09:00:00"}`);
           const end = new Date(`${c.fecha}T${c.hora_fin || "10:00:00"}`);
 
-          const doc = medicos?.find(m => m.id === c.profesional_id);
-          const nombreDoc = doc ? `${doc.nombre} ${doc.apellido}` : "No asignado";
+          // Buscamos el nombre limpio procesado en nuestra lista local
+          const doc = listaMedicos.find(m => m.id === c.profesional_id);
+          const nombreDoc = doc ? `Dr(a). ${doc.nombre}` : "No asignado";
 
           return {
             id: c.id,
-            title: `${c.paciente_nombre || "Paciente"} - ${c.servicio || "Consulta"} (${doc ? doc.nombre : 'Sin asignación'})`,
+            title: `${c.paciente_nombre || "Paciente"} - ${c.servicio || "Consulta"} (${nombreDoc})`,
             start,
             end,
             resource: {
@@ -188,7 +199,7 @@ export default function PanelReservas() {
           >
             <option value="todos">Todos los profesionales</option>
             {profesionales.map(p => (
-              <option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>
+              <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </select>
         </div>
