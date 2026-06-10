@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Stethoscope, Loader2, User, CalendarDays } from "lucide-react";
+import { ArrowLeft, Stethoscope, Loader2, User, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-// --- INTERFACES DE TIPADO (TypeScript) ---
+// --- INTERFACES DE TIPADO ---
 interface Servicio {
   id: string;
   nombre: string;
@@ -31,9 +31,8 @@ interface HorarioDisponible {
 export default function ReservaPublica() {
   const router = useRouter();
   
-  // Estados de datos (Base de Datos)
+  // Estados de datos
   const [servicios, setServicios] = useState<Servicio[]>([]);
-  // 🚀 CORREGIDO: Eliminado 'Professional' y 'any'. Ahora usa estrictamente 'Profesional[]'
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [horasDisponibles, setHorasDisponibles] = useState<HorarioDisponible[]>([]);
   
@@ -44,16 +43,17 @@ export default function ReservaPublica() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>("");
   const [horaSeleccionada, setHoraSeleccionada] = useState<string | null>(null);
   
-  // Estados de carga (Loaders)
+  // Estados para la navegación del calendario custom
+  const [mesActual, setMesActual] = useState<Date>(new Date());
+  
+  // Estados de carga
   const [cargandoServicios, setCargandoServicios] = useState<boolean>(true);
   const [cargandoProfesionales, setCargandoProfesionales] = useState<boolean>(false);
   const [cargandoHoras, setCargandoHoras] = useState<boolean>(false);
   
   const [paso, setPaso] = useState<number>(1);
 
-  // ==========================================
-  // 📥 EFECTO 1: Cargar Servicios Iniciales
-  // ==========================================
+  // 1. Cargar servicios
   useEffect(() => {
     async function obtenerServicios() {
       try {
@@ -74,16 +74,13 @@ export default function ReservaPublica() {
     obtenerServicios();
   }, []);
 
-  // ==========================================
-  // 📥 EFECTO 2: Filtrar Profesionales (Tabla Intermedia)
-  // ==========================================
+  // 2. Filtrar profesionales
   useEffect(() => {
     async function obtenerProfesionalesPorServicio() {
       if (!servicioIdSeleccionado) return;
 
       try {
         setCargandoProfesionales(true);
-        
         const { data, error } = await supabase
           .from("profesional_servicio")
           .select(`
@@ -117,9 +114,7 @@ export default function ReservaPublica() {
     }
   }, [servicioIdSeleccionado, paso]);
 
-  // ==========================================
-  // 📥 EFECTO 3: Calcular Disponibilidad Horaria Real
-  // ==========================================
+  // 3. Calcular disponibilidad horaria real
   useEffect(() => {
     async function obtenerHorasDisponibles() {
       if (!profesionalSeleccionado || !fechaSeleccionada) return;
@@ -128,7 +123,6 @@ export default function ReservaPublica() {
         setCargandoHoras(true);
         const diaSemana = new Date(fechaSeleccionada + "T00:00:00").getDay();
 
-        // 1. Consultar reglas de horario de la tabla 'disponibilidad'
         const { data: disponibilidad, error: errorDisp } = await supabase
           .from("disponibilidad")
           .select("hora_inicio, hora_fin")
@@ -141,7 +135,6 @@ export default function ReservaPublica() {
           return;
         }
 
-        // 2. Consultar citas agendadas de la tabla 'reservas' para evitar colisiones
         const { data: reservasExistentes } = await supabase
           .from("reservas")
           .select("hora_inicio")
@@ -149,7 +142,6 @@ export default function ReservaPublica() {
           .eq("fecha", fechaSeleccionada)
           .not("estado", "eq", "cancelada");
 
-        // 3. Segmentación dinámica de horas
         const bloques: HorarioDisponible[] = [];
         let inicio = parseInt(disponibilidad.hora_inicio.split(":")[0]);
         const fin = parseInt(disponibilidad.hora_fin.split(":")[0]);
@@ -183,7 +175,38 @@ export default function ReservaPublica() {
     }
   }, [fechaSeleccionada, profesionalSeleccionado, paso]);
 
-  // --- CONTROLADORES DE ACCIONES ---
+  // --- LÓGICA GENERADORA DEL CALENDARIO VISUAL ---
+  const obtenerDiasDelMes = () => {
+    const año = mesActual.getFullYear();
+    const mes = mesActual.getMonth();
+    
+    const primerDia = new Date(año, mes, 1);
+    const ultimoDia = new Date(año, mes + 1, 0);
+    
+    const dias = [];
+    
+    let desfase = primerDia.getDay() - 1;
+    if (desfase === -1) desfase = 6; 
+    
+    for (let i = 0; i < desfase; i++) {
+      dias.push(null);
+    }
+    
+    for (let i = 1; i <= ultimoDia.getDate(); i++) {
+      dias.push(new Date(año, mes, i));
+    }
+    
+    return dias;
+  };
+
+  const cambiarMes = (direccion: number) => {
+    setMesActual(new Date(mesActual.getFullYear(), mesActual.getMonth() + direccion, 1));
+  };
+
+  const nombresMeses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  const diasSemana = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+  // --- CONTROLADORES DE FLUJO ---
   const seleccionarServicioYAvanzar = (idServicio: string, nombreServicio: string) => {
     setServicioIdSeleccionado(idServicio);
     setServicioNombreSeleccionado(nombreServicio);
@@ -252,7 +275,7 @@ export default function ReservaPublica() {
         {/* Cuerpo del Formulario */}
         <div className="p-6 md:p-8">
           
-          {/* 📋 PASO 1: SELECCIÓN DE SERVICIO */}
+          {/* PASO 1: SELECCIÓN DE SERVICIO */}
           {paso === 1 && (
             <>
               <h2 className="text-base font-black text-slate-900 uppercase tracking-wider mb-6">Selecciona el Servicio</h2>
@@ -293,7 +316,7 @@ export default function ReservaPublica() {
             </>
           )}
 
-          {/* 👥 PASO 2: SELECCIÓN DE PROFESIONAL */}
+          {/* PASO 2: SELECCIÓN DE PROFESIONAL */}
           {paso === 2 && (
             <>
               <div className="mb-6">
@@ -347,7 +370,7 @@ export default function ReservaPublica() {
             </>
           )}
 
-          {/* 📅 PASO 3: SELECCIÓN DE FECHA Y HORARIO */}
+          {/* 📅 PASO 3: SELECCIÓN DE FECHA Y HORAS */}
           {paso === 3 && (
             <div className="space-y-6 animate-fade-in">
               <div>
@@ -355,62 +378,119 @@ export default function ReservaPublica() {
                 <p className="text-xs text-slate-400 mt-1 font-medium">Revisando disponibilidad en tiempo real.</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Selector de Fecha */}
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">1. Elegir Día de Atención</label>
-                  <input
-                    type="date"
-                    min={new Date().toISOString().split("T")[0]}
-                    value={fechaSeleccionada}
-                    onChange={(e) => {
-                      setFechaSeleccionada(e.target.value);
-                      setHoraSeleccionada(null);
-                    }}
-                    className="w-full bg-white border-2 border-slate-200 rounded-xl p-3 font-medium text-sm text-slate-800 focus:border-blue-600 focus:outline-none transition-colors"
-                  />
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                {/* 📆 CALENDARIO EN CUADRÍCULA */}
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 lg:col-span-7">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                      {nombresMeses[mesActual.getMonth()]} {mesActual.getFullYear()}
+                    </span>
+                    <div className="flex gap-1">
+                      <button 
+                        type="button" 
+                        onClick={() => cambiarMes(-1)} 
+                        className="p-1.5 bg-white border border-slate-200 text-slate-600 hover:text-slate-900 rounded-lg transition-colors active:scale-95"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => cambiarMes(1)} 
+                        className="p-1.5 bg-white border border-slate-200 text-slate-600 hover:text-slate-900 rounded-lg transition-colors active:scale-95"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1 text-center mb-2">
+                    {diasSemana.map(d => (
+                      <span key={d} className="text-[10px] font-black text-slate-400 uppercase tracking-wider py-1">
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1.5">
+                    {obtenerDiasDelMes().map((fecha, index) => {
+                      if (!fecha) return <div key={`empty-${index}`} className="aspect-square" />;
+                      
+                      const formatoStr = `${fecha.getFullYear()}-${(fecha.getMonth() + 1).toString().padStart(2, "0")}-${fecha.getDate().toString().padStart(2, "0")}`;
+                      const seleccionado = fechaSeleccionada === formatoStr;
+                      
+                      const hoyStr = new Date().toISOString().split("T")[0];
+                      const esPasado = formatoStr < hoyStr;
+
+                      return (
+                        <button
+                          key={formatoStr}
+                          type="button"
+                          disabled={esPasado}
+                          onClick={() => {
+                            setFechaSeleccionada(formatoStr);
+                            setHoraSeleccionada(null);
+                          }}
+                          className={`aspect-square rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center relative ${
+                            esPasado
+                              ? "bg-slate-50 text-slate-300 border-transparent cursor-not-allowed"
+                              : seleccionado
+                              ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-100 font-black scale-105"
+                              : "bg-white text-slate-800 border-slate-100 hover:border-slate-300 active:scale-95 shadow-xs"
+                          }`}
+                        >
+                          {fecha.getDate()}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                {/* Selector de Horarios */}
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">2. Bloques Horarios</label>
+                {/* 🕒 SELECTOR DE HORARIOS */}
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 lg:col-span-5 h-full min-h-75 flex flex-col">
+                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-3">Bloques Horarios</label>
+                  
                   {!fechaSeleccionada ? (
-                    <div className="text-center py-8 text-slate-400 text-xs font-medium">Selecciona una fecha a la izquierda para desplegar las horas médicas.</div>
+                    <div className="text-center my-auto py-12 text-slate-400 text-xs font-medium max-w-50 mx-auto">
+                      Selecciona un día en el calendario de la izquierda para ver horas médicas.
+                    </div>
                   ) : cargandoHoras ? (
-                    <div className="text-center py-8 text-slate-400 text-xs font-medium flex flex-col items-center gap-2">
-                      <Loader2 className="animate-spin text-blue-600" size={20} /> Buscando bloques libres...
+                    <div className="text-center my-auto py-12 text-slate-400 text-xs font-medium flex flex-col items-center gap-2">
+                      <Loader2 className="animate-spin text-blue-600" size={24} /> 
+                      Sincronizando turnos...
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-2">
-  {horasDisponibles.map((item) => (
-    <button
-      key={item.hora} // 🚀 CORREGIDO: Ahora React puede identificar de forma única cada botón horario
-      type="button"
-      disabled={!item.disponible}
-      onClick={() => setHoraSeleccionada(item.hora)}
-      className={`p-2.5 text-center text-xs font-bold rounded-xl transition-all border ${
-        !item.disponible
-          ? "bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed line-through"
-          : horaSeleccionada === item.hora
-          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-          : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 active:scale-95"
-      }`}
-    >
-      {item.hora}
-    </button>
-  ))}
-</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-2 overflow-y-auto max-h-62.5 pr-1">
+                      {horasDisponibles.map((item) => (
+                        <button
+                          key={item.hora}
+                          type="button"
+                          disabled={!item.disponible}
+                          onClick={() => setHoraSeleccionada(item.hora)}
+                          className={`p-2.5 text-center text-xs font-bold rounded-xl transition-all border ${
+                            !item.disponible
+                              ? "bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed line-through"
+                              : horaSeleccionada === item.hora
+                              ? "bg-blue-600 text-white border-blue-600 shadow-sm font-black"
+                              : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 active:scale-95 shadow-xs"
+                        }`}
+                        >
+                          {item.hora} hrs
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
+
               </div>
 
-              {/* Confirmación Final */}
+              {/* Botón de Confirmación Final */}
               {horaSeleccionada && (
                 <div className="pt-4 border-t border-slate-100 flex justify-end">
                   <button
                     type="button"
                     onClick={() => alert(`🎉 Turno pre-reservado con éxito para el ${fechaSeleccionada} a las ${horaSeleccionada} hrs.`)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-colors shadow-md active:scale-95"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-95"
                   >
                     Confirmar y Continuar a Pago
                   </button>
