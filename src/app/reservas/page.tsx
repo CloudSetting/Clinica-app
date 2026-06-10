@@ -214,37 +214,50 @@ export default function ReservaPublica() {
   const diasSemana = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
   // ==========================================
-  // 🚀 LOGICA DE ENLACE CON MERCADO PAGO API
+  // 🚀 LOGICA DE ENLACE BLINDADA CON MERCADO PAGO API
   // ==========================================
   const iniciarFlujoPagoMercadoPago = async () => {
     try {
       setProcesandoPago(true);
 
+      if (!servicioIdSeleccionado || !profesionalSeleccionado || !fechaSeleccionada || !horaSeleccionada) {
+        alert("Faltan datos clave de la reserva. Por favor reanuda el proceso.");
+        setProcesandoPago(false);
+        return;
+      }
+
       const pacienteNombre = "Paciente Web";
       const pacienteEmail = "correo@temporal.cl";
       const pacienteTelefono = "+56900000000";
 
-      // Reconstruimos el string queryRedirect idéntico a como lo espera tu página de éxito externa
       const queryRedirect = new URLSearchParams({
-        profesional_id: profesionalSeleccionado || "",
-        servicio: servicioNombreSeleccionado || "Consulta Médica",
-        fecha: fechaSeleccionada,
+        profesional_id: String(profesionalSeleccionado),
+        servicio: String(servicioNombreSeleccionado || "Consulta Médica"),
+        fecha: String(fechaSeleccionada),
         hora_inicio: `${horaSeleccionada}:00`,
-        paciente_nombre: pacienteNombre,
-        paciente_email: pacienteEmail,
-        paciente_telefono: pacienteTelefono
+        paciente_nombre: String(pacienteNombre),
+        paciente_email: String(pacienteEmail),
+        paciente_telefono: String(pacienteTelefono)
       }).toString();
 
-      // Apuntamos a tu endpoint existente
       const respuesta = await fetch("/api/pagos/crear-preference", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify({
-          servicio: servicioNombreSeleccionado,
+          servicio: String(servicioNombreSeleccionado),
           precio: 15000, 
           queryRedirect: queryRedirect 
         }),
       });
+
+      if (!respuesta.ok) {
+        const txtError = await respuesta.text();
+        console.error("Error crítico devuelto por el backend:", txtError);
+        throw new Error(`Código de servidor ${respuesta.status}`);
+      }
 
       const data = await respuesta.json();
 
@@ -254,8 +267,10 @@ export default function ReservaPublica() {
         alert("Error al inicializar la pasarela: " + (data.error || "Desconocido"));
       }
     } catch (err) {
+      // 🚀 CORREGIDO: Tratamiento correcto de errores tipados sin usar explicit-any
+      const mensajeError = err instanceof Error ? err.message : "Error de Red";
       console.error("❌ Error conectando con tu endpoint de pagos:", err);
-      alert("Hubo un problema de conexión al procesar el checkout.");
+      alert(`No se pudo conectar con el servidor de Mercado Pago: ${mensajeError}`);
     } finally {
       setProcesandoPago(false);
     }
@@ -546,6 +561,7 @@ export default function ReservaPublica() {
                     key="btn-confirmar-pago"
                     type="button"
                     disabled={procesandoPago}
+                    // 🚀 CORREGIDO: Se llama correctamente a iniciarFlujoPagoMercadoPago
                     onClick={iniciarFlujoPagoMercadoPago}
                     className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-95 flex items-center gap-2"
                   >
