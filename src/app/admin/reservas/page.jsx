@@ -29,11 +29,13 @@ const COLORES_ESTADOS = {
 export default function PanelReservas() {
   const [reservas, setReservas] = useState([]);
   const [profesionales, setProfesionales] = useState([]);
+  const [servicios, setServicios] = useState([]); // 🚀 NUEVO: Estado para especialidades dinámicas
   const [cargando, setCargando] = useState(true);
   const [vistaActual, setVistaActual] = useState("calendario");
 
   // Filtros
   const [filtroProfesional, setFiltroProfesional] = useState("todos");
+  const [filtroServicio, setFiltroServicio] = useState("todos"); // 🚀 NUEVO: Estado del filtro servicio
   const [filtroEstado, setFiltroEstado] = useState("todos");
   const [fechaInicio, setFechaInicio] = useState("");
   const [fechaFin, setFechaFin] = useState("");
@@ -46,7 +48,7 @@ export default function PanelReservas() {
     try {
       setCargando(true);
 
-      // 1. Traer profesionales (CORREGIDO: select limpio sin 'font:')
+      // 1. Traer profesionales reales
       const { data: medicos, error: errMedicos } = await supabase
         .from("profesionales")
         .select("id, nombre, apellido");
@@ -70,11 +72,14 @@ export default function PanelReservas() {
       if (errCitas) throw errCitas;
 
       if (citas) {
+        // 🚀 EXTRAER SERVICIOS ÚNICOS: Detecta dinámicamente lo que hay en la BD para el filtro
+        const listaServiciosUnicos = [...new Set(citas.map(c => c.servicio).filter(Boolean))];
+        setServicios(listaServiciosUnicos);
+
         const eventosFormateados = citas.map(c => {
           const start = new Date(`${c.fecha}T${c.hora_inicio || "09:00:00"}`);
           const end = new Date(`${c.fecha}T${c.hora_fin || "10:00:00"}`);
 
-          // Buscamos el nombre limpio procesado en nuestra lista local
           const doc = listaMedicos.find(m => m.id === c.profesional_id);
           const nombreDoc = doc ? `Dr(a). ${doc.nombre}` : "No asignado";
 
@@ -120,16 +125,18 @@ export default function PanelReservas() {
     }
   };
 
+  // --- APLICACIÓN DE FILTROS EN TIEMPO REAL ---
   const eventosFiltrados = reservas.filter(evento => {
     const res = evento.resource;
     const cumpleProfesional = filtroProfesional === "todos" || res.profesional_id === filtroProfesional;
     const cumpleEstado = filtroEstado === "todos" || res.estado === filtroEstado;
+    const cumpleServicio = filtroServicio === "todos" || res.servicio === filtroServicio; // 🚀 NUEVO
     
     const fechaCitaStr = res.fecha;
     const cumpleRangoInicio = !fechaInicio || fechaCitaStr >= fechaInicio;
     const cumpleRangoFin = !fechaFin || fechaCitaStr <= fechaFin;
 
-    return cumpleProfesional && cumpleEstado && cumpleRangoInicio && cumpleRangoFin;
+    return cumpleProfesional && cumpleEstado && cumpleServicio && cumpleRangoInicio && cumpleRangoFin;
   });
 
   const eventStyleGetter = (event) => {
@@ -186,8 +193,10 @@ export default function PanelReservas() {
         </div>
       </div>
 
-      {/* Filtros Superiores */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Filtros Superiores Modificados */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        
+        {/* Filtro Profesional */}
         <div>
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">
             Médico / Profesional
@@ -204,6 +213,24 @@ export default function PanelReservas() {
           </select>
         </div>
 
+        {/* 🚀 NUEVO: Filtro Especialidad / Servicio Dinámico */}
+        <div>
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">
+            Especialidad / Servicio
+          </label>
+          <select
+            value={filtroServicio}
+            onChange={(e) => setFiltroServicio(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium focus:outline-none capitalize"
+          >
+            <option value="todos">Todas las especialidades</option>
+            {servicios.map((s, index) => (
+              <option key={index} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Filtro Estado */}
         <div>
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">
             Estado Agenda
