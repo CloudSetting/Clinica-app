@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase"; // Asegúrate de que la ruta sea correcta
+import { supabase } from "@/lib/supabase"; 
 import { 
   Users, 
   CalendarCheck, 
@@ -12,8 +12,10 @@ import {
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [stats, setStats] = useState({
     totalProfesionales: 0,
     reservasHoy: 0,
@@ -29,19 +31,16 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       
-      // 1. Contar profesionales
       const { count: profCount } = await supabase
         .from("profesionales")
         .select("*", { count: 'exact', head: true });
 
-      // 2. Contar reservas de hoy
       const hoy = new Date().toISOString().split('T')[0];
       const { count: resHoyCount } = await supabase
         .from("reservas")
         .select("*", { count: 'exact', head: true })
         .eq('fecha', hoy);
 
-      // 3. Contar próximas reservas (pendientes)
       const { count: proxCount } = await supabase
         .from("reservas")
         .select("*", { count: 'exact', head: true })
@@ -56,6 +55,22 @@ export default function AdminDashboard() {
       console.error("Error cargando stats:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Lógica de logout híbrida (Cierra tanto NextAuth como Supabase si es necesario)
+  const manejarCerrarSesion = async () => {
+    try {
+      // 1. Intentamos cerrar sesión en Supabase por si acaso
+      await supabase.auth.signOut();
+      
+      // 2. 🚀 CORREGIDO: NextAuth borra sesión y redirige a la raíz pública "/"
+      await signOut({ callbackUrl: "/" });
+      
+    } catch (error) {
+      console.log("Error cerrando sesión:", error);
+      // Respaldo directo si NextAuth no está activo en esta sesión
+      router.push("/");
     }
   };
 
@@ -93,7 +108,7 @@ export default function AdminDashboard() {
         </div>
         
         <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={manejarCerrarSesion}
           className="flex items-center gap-2 bg-white border border-gray-200 text-red-600 px-4 py-2 rounded-xl hover:bg-red-50 transition-all font-semibold shadow-sm"
         >
           <LogOut size={18} />
