@@ -277,7 +277,6 @@ export default function ReservaPublica() {
 
       setProcesandoReservaDirecta(true);
 
-      // 🌟 Enviamos 'tipo_flujo=presencial' para que exito/page.tsx guarde por_pagar y pendiente
       const queryParams = new URLSearchParams({
         tipo_flujo: "presencial", 
         profesional_id: String(profesionalSeleccionado),
@@ -606,7 +605,7 @@ export default function ReservaPublica() {
                 </div>
               </div>
 
-              {/* 🚀 CONTENEDOR DE DOBLE BOTONERA DE ACCIÓN FINAL */}
+              {/* CONTENEDOR DE DOBLE BOTONERA DE ACCIÓN FINAL */}
               <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-end items-center gap-3">
                 
                 {/* Botón: Agendar Cita de Forma Directa (Sin pasarela) */}
