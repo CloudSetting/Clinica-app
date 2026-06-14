@@ -43,6 +43,7 @@ function ContenidoExito() {
         const estadoTipoPago = esReservaPresencial ? "por_pagar" : "con_pago";
         const estadoPagoDetalle = esReservaPresencial ? "pendiente" : "aprobado";
 
+        // Mapeo exhaustivo de parámetros a las columnas reales de la tabla 'reservas'
         const { error } = await supabase
           .from("reservas")
           .insert([
@@ -52,7 +53,10 @@ function ContenidoExito() {
               paciente_nombre: searchParams.get("paciente_nombre") || "Paciente Autoconfirmado",
               paciente_email: searchParams.get("paciente_email") || "correo@temporal.cl",
               paciente_telefono: searchParams.get("paciente_telefono") || "+56900000000",
-              informacion_adicional: searchParams.get("informacion_adicional") || null,
+              
+              // 🚀 CORREGIDO: Ahora se guarda en la columna 'notas' existente en tu BD
+              notas: searchParams.get("informacion_adicional") || null, 
+              
               fecha: searchParams.get("fecha") || new Date().toISOString().split('T')[0],
               hora_inicio: horaInicioStr,
               hora_fin: horaFinStr || "10:00:00",
@@ -75,7 +79,6 @@ function ContenidoExito() {
     };
 
     registrarCitaReal();
-  // 🚀 CORREGIDO: Añadidas todas las dependencias requeridas por ESLint de forma exhaustiva
   }, [procederConRegistro, esReservaPresencial, paymentId, preferenceId, searchParams, setErrorSupabase]);
 
   // RENDER A: Procesando Registro
