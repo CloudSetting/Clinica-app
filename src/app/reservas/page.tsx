@@ -5,7 +5,7 @@ import { ArrowLeft, Stethoscope, Loader2, User, CalendarDays, ChevronLeft, Chevr
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-// --- INTERFACES DE TIPADO ---
+// --- INTERFACES DE TIPADO (TypeScript) ---
 interface Servicio {
   id: string;
   nombre: string;
@@ -31,7 +31,7 @@ interface HorarioDisponible {
 export default function ReservaPublica() {
   const router = useRouter();
   
-  // Estados de datos
+  // Estados de datos (Base de Datos)
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [profesionales, setProfesionales] = useState<Profesional[]>([]);
   const [horasDisponibles, setHorasDisponibles] = useState<HorarioDisponible[]>([]);
@@ -43,7 +43,7 @@ export default function ReservaPublica() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>("");
   const [horaSeleccionada, setHoraSeleccionada] = useState<string | null>(null);
   
-  // Datos dinámicos del Paciente (Paso 4)
+  // Datos del Paciente (Paso 4)
   const [pacienteNombre, setPacienteNombre] = useState<string>("");
   const [pacienteEmail, setPacienteEmail] = useState<string>("");
   const [pacienteTelefono, setPacienteTelefono] = useState<string>("");
@@ -85,7 +85,7 @@ export default function ReservaPublica() {
   }, []);
 
   // ==========================================
-  // 📥 EFECTO 2: Filtrar Profesionales
+  // 📥 EFECTO 2: Filtrar Profesionales (Tabla Intermedia)
   // ==========================================
   useEffect(() => {
     async function obtenerProfesionalesPorServicio() {
@@ -127,7 +127,7 @@ export default function ReservaPublica() {
   }, [servicioIdSeleccionado, paso]);
 
   // ==========================================
-  // 📥 EFECTO 3: Calcular Disponibilidad Horaria
+  // 📥 EFECTO 3: Calcular Disponibilidad Horaria Real
   // ==========================================
   useEffect(() => {
     async function obtenerHorasDisponibles() {
@@ -189,7 +189,7 @@ export default function ReservaPublica() {
     }
   }, [fechaSeleccionada, profesionalSeleccionado, paso]);
 
-  // --- GENERACIÓN CALENDARIO ---
+  // --- LÓGICA GENERADORA DEL CALENDARIO VISUAL ---
   const obtenerDiasDelMes = () => {
     const año = mesActual.getFullYear();
     const mes = mesActual.getMonth();
@@ -211,7 +211,7 @@ export default function ReservaPublica() {
   const diasSemana = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
   // ==========================================
-  // 🚀 FLUJO A: ENLACE CON MERCADO PAGO (CON PAGO)
+  // 🚀 FLUJO A: CON PAGO (MERCADO PAGO)
   // ==========================================
   const iniciarFlujoPagoMercadoPago = async () => {
     try {
@@ -224,7 +224,6 @@ export default function ReservaPublica() {
       }
 
       const queryRedirect = new URLSearchParams({
-        status: "approved", // Le indica a tu página de éxito que procese de inmediato
         profesional_id: String(profesionalSeleccionado),
         servicio: String(servicioNombreSeleccionado || "Consulta Médica"),
         fecha: String(fechaSeleccionada),
@@ -267,7 +266,7 @@ export default function ReservaPublica() {
   };
 
   // ==========================================
-  // 🚀 FLUJO B: RESERVA DIRECTA (SIN PAGO / PRESENCIAL)
+  // 🚀 FLUJO B: SIN PAGO (RESERVA DIRECTA / POR PAGAR)
   // ==========================================
   const iniciarFlujoReservaSinPago = () => {
     try {
@@ -278,10 +277,9 @@ export default function ReservaPublica() {
 
       setProcesandoReservaDirecta(true);
 
-      // Armamos la misma Query string pero forzamos el status como 'approved' para saltar la pasarela,
-      // tu archivo exito/page.tsx lo recibirá y lo insertará directo en Supabase de forma automatizada.
+      // 🌟 Enviamos 'tipo_flujo=presencial' para que exito/page.tsx guarde por_pagar y pendiente
       const queryParams = new URLSearchParams({
-        status: "approved", 
+        tipo_flujo: "presencial", 
         profesional_id: String(profesionalSeleccionado),
         servicio: String(servicioNombreSeleccionado || "Consulta Médica"),
         fecha: String(fechaSeleccionada),
@@ -292,13 +290,13 @@ export default function ReservaPublica() {
         informacion_adicional: String(pacienteNotas).trim()
       }).toString();
 
-      // Redirigimos de inmediato al usuario al endpoint de éxito local para el auto-registro
       router.push(`/reservas/exito?${queryParams}`);
     } catch (err) {
       console.error("❌ Error en reserva directa:", err);
     }
   };
 
+  // --- CONTROLADORES DE AVANCE Y RETORNO ---
   const seleccionarServicioYAvanzar = (idServicio: string, nombreServicio: string) => {
     setServicioIdSeleccionado(idServicio);
     setServicioNombreSeleccionado(nombreServicio);
@@ -337,7 +335,7 @@ export default function ReservaPublica() {
           <button
             type="button"
             onClick={manejarVolverAtras}
-            className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:text-slate-900 transition-colors bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs"
+            className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-500 hover:text-slate-900 transition-colors bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs active:scale-95"
           >
             <ArrowLeft size={14} /> Volver
           </button>
@@ -384,8 +382,8 @@ export default function ReservaPublica() {
                         key={servicio.id}
                         type="button"
                         onClick={() => seleccionarServicioYAvanzar(servicio.id, servicio.nombre)}
-                        className={`p-6 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between group ${
-                          seleccionado ? "border-blue-600 bg-blue-50/30 ring-4 ring-blue-50" : "border-slate-100 hover:border-slate-300 bg-white"
+                        className={`p-6 rounded-2xl border-2 text-left transition-all relative flex flex-col justify-between group active:scale-98 ${
+                          seleccionado ? "border-blue-600 bg-blue-50/30 ring-4 ring-blue-50" : "border-slate-100 hover:border-slate-300 bg-white shadow-xs"
                         }`}
                       >
                         <div className="mb-3">
@@ -396,7 +394,7 @@ export default function ReservaPublica() {
                         <div>
                           <p className="font-black text-slate-900 text-sm tracking-tight">{servicio.nombre}</p>
                           {servicio.descripcion && (
-                            <p className="text-xs text-slate-400 mt-1 line-clamp-2">{servicio.descripcion}</p>
+                            <p className="text-xs text-slate-400 mt-1 line-clamp-2 font-medium leading-relaxed">{servicio.descripcion}</p>
                           )}
                         </div>
                       </button>
@@ -440,7 +438,7 @@ export default function ReservaPublica() {
                         key={medico?.id}
                         type="button"
                         onClick={() => seleccionarProfesionalYAvanzar(medico?.id)}
-                        className={`p-5 rounded-2xl border-2 text-left transition-all flex items-center gap-4 group ${
+                        className={`p-5 rounded-2xl border-2 text-left transition-all flex items-center gap-4 group active:scale-98 ${
                           seleccionado ? "border-blue-600 bg-blue-50/30 ring-4 ring-blue-50" : "border-slate-100 hover:border-slate-300 bg-white"
                         }`}
                       >
@@ -476,8 +474,8 @@ export default function ReservaPublica() {
                       {nombresMeses[mesActual.getMonth()]} {mesActual.getFullYear()}
                     </span>
                     <div className="flex gap-1">
-                      <button type="button" onClick={() => cambiarMes(-1)} className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg"><ChevronLeft size={16} /></button>
-                      <button type="button" onClick={() => cambiarMes(1)} className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg"><ChevronRight size={16} /></button>
+                      <button type="button" onClick={() => cambiarMes(-1)} className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg active:scale-95"><ChevronLeft size={16} /></button>
+                      <button type="button" onClick={() => cambiarMes(1)} className="p-1.5 bg-white border border-slate-200 text-slate-600 rounded-lg active:scale-95"><ChevronRight size={16} /></button>
                     </div>
                   </div>
 
@@ -499,7 +497,7 @@ export default function ReservaPublica() {
                           type="button"
                           disabled={esPasado}
                           className={`aspect-square rounded-xl text-xs font-bold transition-all border flex flex-col items-center justify-center relative ${
-                            esPasado ? "bg-slate-50 text-slate-300 border-transparent cursor-not-allowed" : seleccionado ? "bg-blue-600 text-white border-blue-600 shadow-md font-black scale-105" : "bg-white text-slate-800 border-slate-100 hover:border-slate-300"
+                            esPasado ? "bg-slate-50 text-slate-300 border-transparent cursor-not-allowed" : seleccionado ? "bg-blue-600 text-white border-blue-600 shadow-md font-black scale-105" : "bg-white text-slate-800 border-slate-100 hover:border-slate-300 active:scale-95 shadow-xs"
                           }`}
                           onClick={() => { setFechaSeleccionada(formatoStr); setHoraSeleccionada(null); }}
                         >
@@ -525,7 +523,7 @@ export default function ReservaPublica() {
                           disabled={!item.disponible}
                           onClick={() => setHoraSeleccionada(item.hora)}
                           className={`p-2.5 text-center text-xs font-bold rounded-xl transition-all border ${
-                            !item.disponible ? "bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed line-through" : horaSeleccionada === item.hora ? "bg-blue-600 text-white border-blue-600 font-black" : "bg-white text-slate-700 border-slate-200"
+                            !item.disponible ? "bg-slate-100 text-slate-300 border-slate-100 cursor-not-allowed line-through" : horaSeleccionada === item.hora ? "bg-blue-600 text-white border-blue-600 font-black" : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 active:scale-95 shadow-xs"
                           }`}
                         >
                           {item.hora} hrs
@@ -541,7 +539,7 @@ export default function ReservaPublica() {
                   <button
                     type="button"
                     onClick={() => setPaso(4)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-95"
                   >
                     Ingresar mis datos
                   </button>
@@ -550,7 +548,7 @@ export default function ReservaPublica() {
             </div>
           )}
 
-          {/* PASO 4: FORMULARIO DE INFORMACIÓN PERSONAL (OPCIÓN CON Y SIN PAGO) */}
+          {/* PASO 4: FORMULARIO DE INFORMACIÓN PERSONAL (CON DOBLE BOTONERA) */}
           {paso === 4 && (
             <div className="space-y-6 animate-fade-in">
               <div>
@@ -608,10 +606,10 @@ export default function ReservaPublica() {
                 </div>
               </div>
 
-              {/* 🚀 DOBLE BOTÓN DE CONFIRMACIÓN */}
+              {/* 🚀 CONTENEDOR DE DOBLE BOTONERA DE ACCIÓN FINAL */}
               <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-end items-center gap-3">
                 
-                {/* Botón Nuevo: Sin Pago / Convenio Presencial */}
+                {/* Botón: Agendar Cita de Forma Directa (Sin pasarela) */}
                 <button
                   type="button"
                   disabled={procesandoPago || procesandoReservaDirecta}
@@ -631,7 +629,7 @@ export default function ReservaPublica() {
                   )}
                 </button>
 
-                {/* Botón Clásico: Con pasarela Mercado Pago */}
+                {/* Botón: Redirección Segura a Pasarela Mercado Pago */}
                 <button
                   key="btn-confirmar-pago"
                   type="button"
