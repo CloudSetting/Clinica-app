@@ -10,16 +10,13 @@ function ContenidoExito() {
   const [guardando, setGuardando] = useState(true);
   const [errorSupabase, setErrorSupabase] = useState(null);
 
-  // Parámetros estándar de Mercado Pago
   const status = searchParams.get("status");
   const paymentId = searchParams.get("payment_id");
   const preferenceId = searchParams.get("preference_id");
   
-  // Detector de reserva directa sin pago
   const tipoFlujo = searchParams.get("tipo_flujo");
   const esReservaPresencial = tipoFlujo === "presencial";
   
-  // Condición unificada de entrada
   const procederConRegistro = status === "approved" || esReservaPresencial;
 
   useEffect(() => {
@@ -30,7 +27,7 @@ function ContenidoExito() {
       }
 
       try {
-        console.log("💾 Procesando inserción en la base de datos de Supabase...");
+        console.log("💾 Registrando cita con comentarios...");
 
         const horaInicioStr = searchParams.get("hora_inicio") || "09:00:00";
         
@@ -43,7 +40,9 @@ function ContenidoExito() {
         const estadoTipoPago = esReservaPresencial ? "por_pagar" : "con_pago";
         const estadoPagoDetalle = esReservaPresencial ? "pendiente" : "aprobado";
 
-        // Mapeo exhaustivo de parámetros a las columnas reales de la tabla 'reservas'
+        // Capturamos el comentario sin importar cómo venga nombrado en la URL
+        const comentarioPaciente = searchParams.get("notas") || searchParams.get("informacion_adicional") || null;
+
         const { error } = await supabase
           .from("reservas")
           .insert([
@@ -54,8 +53,8 @@ function ContenidoExito() {
               paciente_email: searchParams.get("paciente_email") || "correo@temporal.cl",
               paciente_telefono: searchParams.get("paciente_telefono") || "+56900000000",
               
-              // 🚀 CORREGIDO: Ahora se guarda en la columna 'notas' existente en tu BD
-              notas: searchParams.get("informacion_adicional") || null, 
+              // 🌟 AQUÍ SE QUEDA: Se inserta de manera segura en la columna real de Supabase
+              notas: comentarioPaciente, 
               
               fecha: searchParams.get("fecha") || new Date().toISOString().split('T')[0],
               hora_inicio: horaInicioStr,
@@ -69,7 +68,7 @@ function ContenidoExito() {
 
         if (error) throw error;
         
-        console.log("🎉 ¡Cita registrada exitosamente en Supabase!");
+        console.log("🎉 ¡Cita y notas registradas en Supabase!");
       } catch (err) {
         console.error("❌ Error Supabase:", err);
         setErrorSupabase(err.message || "Error al intentar registrar el turno.");
@@ -81,18 +80,16 @@ function ContenidoExito() {
     registrarCitaReal();
   }, [procederConRegistro, esReservaPresencial, paymentId, preferenceId, searchParams, setErrorSupabase]);
 
-  // RENDER A: Procesando Registro
   if (procederConRegistro && guardando) {
     return (
       <div className="text-center py-10 max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl border border-slate-100 animate-pulse">
         <Loader2 className="animate-spin text-blue-600 mx-auto mb-4" size={40} />
         <h3 className="text-xl font-bold text-slate-900">Confirmando tu reserva...</h3>
-        <p className="text-slate-500 text-sm mt-2">Estamos guardando tu espacio médico en la base de datos de la clínica.</p>
+        <p className="text-slate-500 text-sm mt-2">Estamos guardando tu espacio médico con tus indicaciones en el sistema...</p>
       </div>
     );
   }
 
-  // RENDER B: Éxito total
   if (procederConRegistro && !errorSupabase) {
     return (
       <div className="text-center py-10 max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
@@ -102,8 +99,8 @@ function ContenidoExito() {
         <h3 className="text-2xl font-black text-slate-900 tracking-tight">¡Cita Agendada!</h3>
         <p className="text-slate-500 text-xs mt-2 leading-relaxed">
           {esReservaPresencial 
-            ? "Tu espacio ha sido bloqueado con éxito. Recuerda realizar el pago de la consulta directamente en la recepción de la clínica."
-            : "Tu pago ha sido procesado con éxito y la cita médica quedó agendada en nuestro sistema."}
+            ? "Tu espacio ha sido bloqueado con éxito. Recuerda realizar el pago directamente en la clínica."
+            : "Tu pago ha sido procesado con éxito y las notas de tu consulta han sido enviadas al especialista."}
         </p>
         
         <p className="text-[10px] bg-slate-100 text-slate-500 font-mono py-1 px-3 rounded-lg mt-4 inline-block border font-bold">
@@ -112,13 +109,12 @@ function ContenidoExito() {
 
         <div className="mt-6 space-y-2 text-xs">
           <button type="button" onClick={() => window.location.href = "/reservas"} className="w-full py-3 bg-blue-600 text-white font-black uppercase tracking-wider rounded-xl hover:bg-blue-700 shadow-md transition-all active:scale-95">Agendar otra cita</button>
-          <button type="button" onClick={() => window.location.href = "/"} className="w-full py-3 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold rounded-xl transition-all">Volver al inicio público</button>
+          <button type="button" onClick={() => window.location.href = "/"} className="w-full py-3 bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold rounded-xl transition-all">Volver al inicio</button>
         </div>
       </div>
     );
   }
 
-  // RENDER C: Fallo o Error
   return (
     <div className="text-center py-10 max-w-md mx-auto bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
       <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
@@ -126,10 +122,10 @@ function ContenidoExito() {
       </div>
       <h3 className="text-2xl font-black text-slate-900 tracking-tight">Hubo un problema</h3>
       <p className="text-slate-500 text-xs mt-2 max-w-xs mx-auto leading-relaxed">
-        {errorSupabase ? `Error crítico del servidor: ${errorSupabase}` : "La pasarela de Mercado Pago no pudo validar los fondos de la transacción automáticamente."}
+        {errorSupabase ? `Error de base de datos: ${errorSupabase}` : "La transacción no pudo ser validada de forma automática."}
       </p>
       <div className="mt-6">
-        <button type="button" onClick={() => window.location.href = "/reservas"} className="w-full py-3 bg-slate-900 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all hover:bg-slate-800 active:scale-95 shadow-md">Intentar agendar nuevamente</button>
+        <button type="button" onClick={() => window.location.href = "/reservas"} className="w-full py-3 bg-slate-900 text-white text-xs font-black uppercase tracking-wider rounded-xl transition-all hover:bg-slate-800 active:scale-95 shadow-md">Intentar nuevamente</button>
       </div>
     </div>
   );
