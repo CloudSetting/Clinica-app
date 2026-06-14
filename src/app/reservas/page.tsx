@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Stethoscope, Loader2, User, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, Stethoscope, Loader2, User, CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, CalendarCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -47,7 +47,6 @@ export default function ReservaPublica() {
   const [pacienteNombre, setPacienteNombre] = useState<string>("");
   const [pacienteEmail, setPacienteEmail] = useState<string>("");
   const [pacienteTelefono, setPacienteTelefono] = useState<string>("");
-  // 🚀 NUEVO ESTADO: Información adicional (Opcional)
   const [pacienteNotas, setPacienteNotas] = useState<string>("");
   
   // Estados para la navegación del calendario custom
@@ -58,6 +57,7 @@ export default function ReservaPublica() {
   const [cargandoProfesionales, setCargandoProfesionales] = useState<boolean>(false);
   const [cargandoHoras, setCargandoHoras] = useState<boolean>(false);
   const [procesandoPago, setProcesandoPago] = useState<boolean>(false);
+  const [procesandoReservaDirecta, setProcesandoReservaDirecta] = useState<boolean>(false);
   
   const [paso, setPaso] = useState<number>(1);
 
@@ -93,7 +93,7 @@ export default function ReservaPublica() {
 
       try {
         setCargandoProfesionales(true);
-        const { data, error = null } = await supabase
+        const { data, error } = await supabase
           .from("profesional_servicio")
           .select(`
             profesionales (
@@ -211,11 +211,9 @@ export default function ReservaPublica() {
   const diasSemana = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
   // ==========================================
-  // 🚀 ENLACE MERCADO PAGO ACTUALIZADO
+  // 🚀 FLUJO A: ENLACE CON MERCADO PAGO (CON PAGO)
   // ==========================================
-  const iniciarFlujoPagoMercadoPago = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const iniciarFlujoPagoMercadoPago = async () => {
     try {
       setProcesandoPago(true);
 
@@ -226,6 +224,7 @@ export default function ReservaPublica() {
       }
 
       const queryRedirect = new URLSearchParams({
+        status: "approved", // Le indica a tu página de éxito que procese de inmediato
         profesional_id: String(profesionalSeleccionado),
         servicio: String(servicioNombreSeleccionado || "Consulta Médica"),
         fecha: String(fechaSeleccionada),
@@ -233,8 +232,7 @@ export default function ReservaPublica() {
         paciente_nombre: String(pacienteNombre),
         paciente_email: String(pacienteEmail),
         paciente_telefono: String(pacienteTelefono),
-        // 🚀 ENVIADO: Mandamos las notas limpias en el string relacional
-        informacion_adicional: String(pacienteNotas).trim() 
+        informacion_adicional: String(pacienteNotas).trim()
       }).toString();
 
       const respuesta = await fetch("/api/pagos/crear-preferencia", {
@@ -250,9 +248,7 @@ export default function ReservaPublica() {
         }),
       });
 
-      if (!respuesta.ok) {
-        throw new Error(`Código de servidor ${respuesta.status}`);
-      }
+      if (!respuesta.ok) throw new Error(`Código de servidor ${respuesta.status}`);
 
       const data = await respuesta.json();
 
@@ -267,6 +263,39 @@ export default function ReservaPublica() {
       alert(`No se pudo conectar con el servidor de Mercado Pago: ${mensajeError}`);
     } finally {
       setProcesandoPago(false);
+    }
+  };
+
+  // ==========================================
+  // 🚀 FLUJO B: RESERVA DIRECTA (SIN PAGO / PRESENCIAL)
+  // ==========================================
+  const iniciarFlujoReservaSinPago = () => {
+    try {
+      if (!pacienteNombre || !pacienteEmail || !pacienteTelefono) {
+        alert("Por favor rellena todos los campos requeridos.");
+        return;
+      }
+
+      setProcesandoReservaDirecta(true);
+
+      // Armamos la misma Query string pero forzamos el status como 'approved' para saltar la pasarela,
+      // tu archivo exito/page.tsx lo recibirá y lo insertará directo en Supabase de forma automatizada.
+      const queryParams = new URLSearchParams({
+        status: "approved", 
+        profesional_id: String(profesionalSeleccionado),
+        servicio: String(servicioNombreSeleccionado || "Consulta Médica"),
+        fecha: String(fechaSeleccionada),
+        hora_inicio: `${horaSeleccionada}:00`,
+        paciente_nombre: String(pacienteNombre),
+        paciente_email: String(pacienteEmail),
+        paciente_telefono: String(pacienteTelefono),
+        informacion_adicional: String(pacienteNotas).trim()
+      }).toString();
+
+      // Redirigimos de inmediato al usuario al endpoint de éxito local para el auto-registro
+      router.push(`/reservas/exito?${queryParams}`);
+    } catch (err) {
+      console.error("❌ Error en reserva directa:", err);
     }
   };
 
@@ -521,9 +550,9 @@ export default function ReservaPublica() {
             </div>
           )}
 
-          {/* PASO 4: FORMULARIO DE INFORMACIÓN PERSONAL (CON NOTAS ADICIONALES) */}
+          {/* PASO 4: FORMULARIO DE INFORMACIÓN PERSONAL (OPCIÓN CON Y SIN PAGO) */}
           {paso === 4 && (
-            <form onSubmit={iniciarFlujoPagoMercadoPago} className="space-y-6 animate-fade-in">
+            <div className="space-y-6 animate-fade-in">
               <div>
                 <h2 className="text-base font-black text-slate-900 uppercase tracking-wider">Datos del Paciente</h2>
                 <p className="text-xs text-slate-400 mt-1 font-medium">Por favor ingresa la información de quien asistirá a la cita médica.</p>
@@ -534,7 +563,6 @@ export default function ReservaPublica() {
                   <label className="text-xs font-black text-slate-700 uppercase tracking-wider">Nombre Completo *</label>
                   <input
                     type="text"
-                    required
                     placeholder="Ej. Juan Carlos Pérez"
                     value={pacienteNombre}
                     onChange={(e) => setPacienteNombre(e.target.value)}
@@ -546,7 +574,6 @@ export default function ReservaPublica() {
                   <label className="text-xs font-black text-slate-700 uppercase tracking-wider">Teléfono de Contacto *</label>
                   <input
                     type="tel"
-                    required
                     placeholder="Ej. +56912345678"
                     value={pacienteTelefono}
                     onChange={(e) => setPacienteTelefono(e.target.value)}
@@ -558,7 +585,6 @@ export default function ReservaPublica() {
                   <label className="text-xs font-black text-slate-700 uppercase tracking-wider">Correo Electrónico *</label>
                   <input
                     type="email"
-                    required
                     placeholder="Ej. juan.perez@email.com"
                     value={pacienteEmail}
                     onChange={(e) => setPacienteEmail(e.target.value)}
@@ -567,7 +593,6 @@ export default function ReservaPublica() {
                   <p className="text-[10px] text-slate-400 font-medium">A esta dirección enviaremos el comprobante de pago y el link de atención.</p>
                 </div>
 
-                {/* 🚀 NUEVO INPUT: Área de Notas / Información Adicional Opcional */}
                 <div className="flex flex-col gap-1.5 md:col-span-2">
                   <div className="flex justify-between items-center">
                     <label className="text-xs font-black text-slate-700 uppercase tracking-wider">Información Adicional</label>
@@ -583,24 +608,49 @@ export default function ReservaPublica() {
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 flex justify-end">
+              {/* 🚀 DOBLE BOTÓN DE CONFIRMACIÓN */}
+              <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row justify-end items-center gap-3">
+                
+                {/* Botón Nuevo: Sin Pago / Convenio Presencial */}
+                <button
+                  type="button"
+                  disabled={procesandoPago || procesandoReservaDirecta}
+                  onClick={iniciarFlujoReservaSinPago}
+                  className="w-full sm:w-auto border-2 border-slate-200 hover:border-slate-300 disabled:opacity-50 text-slate-600 font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all active:scale-95 flex items-center justify-center gap-2 bg-white shadow-xs"
+                >
+                  {procesandoReservaDirecta ? (
+                    <>
+                      <Loader2 className="animate-spin" size={14} />
+                      Agendando Cita...
+                    </>
+                  ) : (
+                    <>
+                      <CalendarCheck size={14} />
+                      Reservar sin Pago
+                    </>
+                  )}
+                </button>
+
+                {/* Botón Clásico: Con pasarela Mercado Pago */}
                 <button
                   key="btn-confirmar-pago"
-                  type="submit"
-                  disabled={procesandoPago}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md flex items-center gap-2"
+                  type="button"
+                  disabled={procesandoPago || procesandoReservaDirecta}
+                  onClick={iniciarFlujoPagoMercadoPago}
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
                 >
                   {procesandoPago ? (
                     <>
                       <Loader2 className="animate-spin" size={14} />
-                      Conectando con Mercado Pago...
+                      Conectando Pasarela...
                     </>
                   ) : (
                     "Confirmar y Continuar a Pago"
                   )}
                 </button>
+
               </div>
-            </form>
+            </div>
           )}
         </div>
       </div>
