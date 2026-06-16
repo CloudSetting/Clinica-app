@@ -28,45 +28,79 @@ const authOptions = {
 
         if (!credentials?.email || !credentials?.password) return null;
 
-        // Buscar el administrador en la base de datos de Supabase
-        const { data: admin, error } = await supabaseAdmin
+        const emailInput = (credentials.email as string || "").trim();
+        const passwordInput = credentials.password as string || "";
+
+        // =========================================================
+        // 1. INTENTO DE LOGIN COMO ADMINISTRADOR
+        // =========================================================
+        const { data: admin } = await supabaseAdmin
           .from("admins")
           .select("id, email, password_hash, nombre, rol, activo")
-          .eq("email", credentials.email)
-          .single();
+          .eq("email", emailInput)
+          .maybeSingle();
 
-        if (error || !admin) {
-          console.log("❌ Usuario no encontrado o error en query");
-          return null;
+        if (admin) {
+          if (!admin.activo) {
+            console.log("❌ Usuario administrador inactivo");
+            return null;
+          }
+
+          const hashFormateado = (admin.password_hash as string).replace(/^\$2y\$/, "$2a$");
+          const passwordValida = await bcrypt.compare(passwordInput, hashFormateado);
+
+          if (!passwordValida) {
+            console.log("❌ Contraseña de administrador incorrecta");
+            return null;
+          }
+
+          console.log("🎉 Login exitoso como Administrador:", admin.nombre);
+          
+          return {
+            id: admin.id,
+            email: admin.email,
+            name: admin.nombre,
+            role: (admin.rol as string) || "admin",
+          };
         }
 
-        if (!admin.activo) {
-          console.log("❌ Usuario inactivo");
-          return null;
-        }
-
-        const hashEnDB = admin.password_hash as string;
-        const passwordInput = credentials.password as string;
-
-        // --- NORMALIZACIÓN DE HASH ---
-        // Previene errores si el hash viene con formatos diferentes como $2y$ en la base de datos
-        const hashFormateado = hashEnDB.replace(/^\$2y\$/, "$2a$");
+        // =========================================================
+        // 2. INTENTO DE LOGIN COMO PROFESIONAL MÉDICO
+        // =========================================================
+        console.log("🩺 No es admin, buscando en la tabla de profesionales...");
         
-        const passwordValida = await bcrypt.compare(passwordInput, hashFormateado);
+        const { data: profesional } = await supabaseAdmin
+          .from("profesionales")
+          .select("id, email, password_hash, nombre, apellido, activo")
+          .eq("email", emailInput)
+          .maybeSingle();
 
-        if (!passwordValida) {
-          console.log("❌ Contraseña incorrecta");
-          return null;
+        if (profesional) {
+          if (profesional.activo === false) {
+            console.log("❌ Profesional médico inactivo");
+            return null;
+          }
+
+          const hashFormateado = (profesional.password_hash as string).replace(/^\$2y\$/, "$2a$");
+          const passwordValida = await bcrypt.compare(passwordInput, hashFormateado);
+
+          if (!passwordValida) {
+            console.log("❌ Contraseña de profesional incorrecta");
+            return null;
+          }
+
+          console.log("🎉 Login exitoso como Profesional:", profesional.nombre);
+
+          return {
+            id: profesional.id,
+            email: profesional.email,
+            name: `${profesional.nombre} ${profesional.apellido || ""}`.trim(),
+            role: "profesional",
+          };
         }
 
-        console.log("🎉 Login exitoso para:", admin.nombre);
-        
-        return {
-          id: admin.id,
-          email: admin.email,
-          name: admin.nombre,
-          role: admin.rol as string,
-        };
+        console.log("❌ Credenciales no corresponden a ninguna cuenta registrada");
+        return null;
       },
     }),
   ],
@@ -79,6 +113,13 @@ const authOptions = {
       if (session.user) session.user.role = token.role as string;
       return session;
     },
+async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
+      // 🚀 Si el callbackUrl explícito apunta al dashboard del profesional, lo aprobamos
+      if (url.includes("/dashboard-profesional")) {
+        return url;
+      }
+      return `${baseUrl}/admin/profesionales`;
+    },
   },
   pages: {
     signIn: "/admin/login",
@@ -86,7 +127,6 @@ const authOptions = {
   session: {
     strategy: "jwt" as const,
   },
-  // Configuración crucial para que las cookies viajen seguras bajo HTTPS en Vercel
   useSecureCookies: process.env.NODE_ENV === "production",
   cookies: {
     sessionToken: {
@@ -102,9 +142,5 @@ const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-// 1. Inicializamos NextAuth pasándole la configuración
 const authResult = NextAuth(authOptions);
-
-// 2. Exportamos las funciones directamente usando las constantes nativas de la librería.
-// Esto conserva de forma automática el tipo 'NextRequest' interno que exige Next.js 16.
 export const { GET, POST } = authResult.handlers;
