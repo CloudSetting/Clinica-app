@@ -1,38 +1,41 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { getToken } from 'next-auth/jwt';
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { getToken } from "next-auth/jwt";
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  
-  if (
-    pathname === '/admin/login' || 
-    pathname.startsWith('/api/') || 
-    pathname.includes('.') 
-  ) {
-    return NextResponse.next();
-  }
+  const path = req.nextUrl.pathname;
 
-  // 👈 CORRECCIÓN: Detectamos si estamos en producción para buscar la cookie con el prefijo __Secure-
-  const esProduccion = process.env.NODE_ENV === 'production';
-  const nombreCookie = esProduccion ? '__Secure-next-auth.session-token' : 'next-auth.session-token';
-
+  // 🧠 Obtenemos el token desencriptado directamente desde la cookie usando NextAuth nativo
   const token = await getToken({ 
     req, 
-    secret: process.env.NEXTAUTH_SECRET,
-    secureCookie: esProduccion, // Le avisa a NextAuth que use HTTPS en Vercel
-    cookieName: nombreCookie,   // Forzamos el nombre correcto de la cookie
+    secret: process.env.NEXTAUTH_SECRET 
   });
 
-  if (pathname.startsWith('/admin') && !token) {
-    console.log("🔒 Middleware: Acceso denegado, redirigiendo a login.");
-    return NextResponse.redirect(new URL('/admin/login', req.url));
+  // Si no hay token y está intentando entrar a una ruta protegida, al login de cabeza
+  if (!token) {
+    return NextResponse.redirect(new URL("/admin/login", req.url));
   }
 
-  console.log("🔓 Middleware: Acceso concedido para la ruta:", pathname);
+  const role = token.role as string | undefined;
+
+  // 1. Si intenta entrar a la administración global pero es un médico, lo enviamos a su portal
+  if (path.startsWith("/admin") && role !== "admin" && role !== "superadmin") {
+    return NextResponse.redirect(new URL("/dashboard-profesional", req.url));
+  }
+
+  // 2. Si intenta entrar al dashboard profesional pero no está logueado como tal, lo mandamos al login
+  if (path.startsWith("/dashboard-profesional") && role !== "profesional") {
+    return NextResponse.redirect(new URL("/admin/login", req.url));
+  }
+
   return NextResponse.next();
 }
 
+// Filtramos qué rutas vigila el Middleware de forma precisa
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: [
+    "/admin/profesionales/:path*",
+    "/admin/pagos/:path*",
+    "/dashboard-profesional/:path*"
+  ],
 };
