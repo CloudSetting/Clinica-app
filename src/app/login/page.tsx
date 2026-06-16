@@ -1,20 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase"; // 🚀 Única importación interna agregada
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [cargando, setCargando] = useState(false); // Control interno de redirección
+  const [cargando, setCargando] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setCargando(true);
 
     const result = await signIn("credentials", {
       email: email.trim(),
@@ -23,25 +23,15 @@ export default function LoginPage() {
     });
 
     if (result?.ok) {
-      try {
-        setCargando(true);
+      // 🧠 Forzamos una recarga rápida de la sesión para leer el rol inyectado en el route.ts
+      const respuestaSesion = await fetch("/api/auth/session");
+      const sesionActual = await respuestaSesion.json();
 
-        // 🧠 Verificación silenciosa por detrás: ¿Es el email de un médico?
-        const { data: profesional } = await supabase
-          .from("profesionales")
-          .select("email")
-          .eq("email", email.trim())
-          .maybeSingle();
-
-        if (profesional) {
-          // 🩺 Es un médico, lo mandamos a su cuenta individual
-          router.push("/dashboard-profesional");
-        } else {
-          // 🏢 Es administrador, se mantiene tu redirección original intacta
-          router.push("/admin/profesionales");
-        }
-      } catch (err) {
-        // Por resguardo, si falla la consulta, mantenemos tu flujo original
+      if (sesionActual?.user?.role === "profesional") {
+        // 🩺 Si el rol detectado en la base de datos es profesional, se va a su panel
+        router.push("/dashboard-profesional");
+      } else {
+        // 🏢 Si es administrador, mantiene tu ruta original
         router.push("/admin/profesionales");
       }
     } else {
