@@ -28,7 +28,7 @@ const authOptions = {
 
         if (!credentials?.email || !credentials?.password) return null;
 
-        const emailInput = (credentials.email as string || "").trim();
+        const emailInput = (credentials.email as string || "").trim().toLowerCase();
         const passwordInput = credentials.password as string || "";
 
         // =========================================================
@@ -54,7 +54,7 @@ const authOptions = {
             return null;
           }
 
-          console.log("🎉 Login exitoso como Administrador:", admin.nombre);
+          console.log("🎉 Login exitoso como Admin:", admin.nombre);
           
           return {
             id: admin.id,
@@ -64,42 +64,67 @@ const authOptions = {
           };
         }
 
-        // =========================================================
+// =========================================================
         // 2. INTENTO DE LOGIN COMO PROFESIONAL MÉDICO
         // =========================================================
-        console.log("🩺 No es admin, buscando en la tabla de profesionales...");
+        console.log("🩺 No es admin, buscando en profesionales...");
         
-        const { data: profesional } = await supabaseAdmin
+        // Intento 1: Buscar en la columna 'email'
+        let { data: profesional } = await supabaseAdmin
           .from("profesionales")
-          .select("id, email, password_hash, nombre, apellido, activo")
+          .select("id, email, correo, password_hash, nombre, apellido, activo")
           .eq("email", emailInput)
           .maybeSingle();
 
+        // Intento 2: Si no apareció por 'email', buscamos en la columna 'correo'
+        if (!profesional) {
+          console.log("🔍 No se encontró en la columna 'email', buscando en la columna 'correo'...");
+          const { data: profesionalPorCorreo } = await supabaseAdmin
+            .from("profesionales")
+            .select("id, email, correo, password_hash, nombre, apellido, activo")
+            .eq("correo", emailInput)
+            .maybeSingle();
+          
+          profesional = profesionalPorCorreo;
+        }
+
         if (profesional) {
+          console.log("👤 Profesional encontrado en Supabase:", profesional.nombre);
+
           if (profesional.activo === false) {
-            console.log("❌ Profesional médico inactivo");
+            console.log("❌ Acceso denegado: El profesional está inactivo");
             return null;
+          }
+
+          if (!profesional.password_hash) {
+            console.log("❌ Error fatal: La columna 'password_hash' de este médico está vacía (NULL) en Supabase.");
+            return null;
+          }
+
+          // Verificamos si escribiste la clave en texto plano por accidente
+          if (!profesional.password_hash.startsWith("$2")) {
+            console.log("⚠️ Alerta: El valor en 'password_hash' no es un hash válido de Bcrypt. ¡Parece texto plano!");
           }
 
           const hashFormateado = (profesional.password_hash as string).replace(/^\$2y\$/, "$2a$");
           const passwordValida = await bcrypt.compare(passwordInput, hashFormateado);
 
           if (!passwordValida) {
-            console.log("❌ Contraseña de profesional incorrecta");
+            console.log("❌ Contraseña incorrecta: Bcrypt no coincide.");
             return null;
           }
 
-          console.log("🎉 Login exitoso como Profesional:", profesional.nombre);
+          console.log("🎉 ¡Login exitoso! Validaciones correctas para:", profesional.nombre);
 
           return {
             id: profesional.id,
-            email: profesional.email,
+            email: profesional.email || profesional.correo,
             name: `${profesional.nombre} ${profesional.apellido || ""}`.trim(),
             role: "profesional",
           };
         }
 
-        console.log("❌ Credenciales no corresponden a ninguna cuenta registrada");
+        console.log("❌ El correo ingresado no existe ni en 'email' ni en 'correo' dentro de profesionales.");
         return null;
       },
     }),
@@ -113,8 +138,7 @@ const authOptions = {
       if (session.user) session.user.role = token.role as string;
       return session;
     },
-async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
-      // 🚀 Si el callbackUrl explícito apunta al dashboard del profesional, lo aprobamos
+    async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
       if (url.includes("/dashboard-profesional")) {
         return url;
       }
