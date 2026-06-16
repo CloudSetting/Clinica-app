@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase"; // 🚀 Única importación interna agregada
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [cargando, setCargando] = useState(false); // Control interno de redirección
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -15,15 +17,36 @@ export default function LoginPage() {
     setError("");
 
     const result = await signIn("credentials", {
-      email,
+      email: email.trim(),
       password,
       redirect: false,
     });
 
     if (result?.ok) {
-      router.push("/admin/profesionales");
+      try {
+        setCargando(true);
+
+        // 🧠 Verificación silenciosa por detrás: ¿Es el email de un médico?
+        const { data: profesional } = await supabase
+          .from("profesionales")
+          .select("email")
+          .eq("email", email.trim())
+          .maybeSingle();
+
+        if (profesional) {
+          // 🩺 Es un médico, lo mandamos a su cuenta individual
+          router.push("/dashboard-profesional");
+        } else {
+          // 🏢 Es administrador, se mantiene tu redirección original intacta
+          router.push("/admin/profesionales");
+        }
+      } catch (err) {
+        // Por resguardo, si falla la consulta, mantenemos tu flujo original
+        router.push("/admin/profesionales");
+      }
     } else {
       setError("Email o contraseña incorrectos");
+      setCargando(false);
     }
   };
 
@@ -45,7 +68,8 @@ export default function LoginPage() {
             <input
               type="email"
               required
-              className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              disabled={cargando}
+              className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-50"
               placeholder="Correo electrónico"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -53,7 +77,8 @@ export default function LoginPage() {
             <input
               type="password"
               required
-              className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              disabled={cargando}
+              className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-50"
               placeholder="Contraseña"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -62,9 +87,10 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+            disabled={cargando}
+            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-70"
           >
-            Iniciar Sesión
+            {cargando ? "Cargando..." : "Iniciar Sesión"}
           </button>
         </form>
       </div>
