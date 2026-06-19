@@ -69,16 +69,14 @@ const authOptions = {
         // =========================================================
         console.log("🩺 No es admin, buscando en profesionales...");
         
-        // Intento 1: Buscar en la columna 'email'
         let { data: profesional } = await supabaseAdmin
           .from("profesionales")
           .select("id, email, correo, password_hash, nombre, apellido, activo")
           .eq("email", emailInput)
           .maybeSingle();
 
-        // Intento 2: Si no apareció por 'email', buscamos en la columna 'correo'
         if (!profesional) {
-          console.log("🔍 No se encontró en la columna 'email', buscando en la columna 'correo'...");
+          console.log("🔍 Buscando en la columna 'correo'...");
           const { data: profesionalPorCorreo } = await supabaseAdmin
             .from("profesionales")
             .select("id, email, correo, password_hash, nombre, apellido, activo")
@@ -89,32 +87,25 @@ const authOptions = {
         }
 
         if (profesional) {
-          console.log("👤 Profesional encontrado en Supabase:", profesional.nombre);
-
           if (profesional.activo === false) {
-            console.log("❌ Acceso denegado: El profesional está inactivo");
+            console.log("❌ Profesional médico inactivo");
             return null;
           }
 
           if (!profesional.password_hash) {
-            console.log("❌ Error fatal: La columna 'password_hash' de este médico está vacía (NULL) en Supabase.");
+            console.log("❌ Columna 'password_hash' vacía en Supabase.");
             return null;
-          }
-
-          // Verificamos si escribiste la clave en texto plano por accidente
-          if (!profesional.password_hash.startsWith("$2")) {
-            console.log("⚠️ Alerta: El valor en 'password_hash' no es un hash válido de Bcrypt. ¡Parece texto plano!");
           }
 
           const hashFormateado = (profesional.password_hash as string).replace(/^\$2y\$/, "$2a$");
           const passwordValida = await bcrypt.compare(passwordInput, hashFormateado);
 
           if (!passwordValida) {
-            console.log("❌ Contraseña incorrecta: Bcrypt no coincide.");
+            console.log("❌ Contraseña incorrecta para profesional.");
             return null;
           }
 
-          console.log("🎉 ¡Login exitoso! Validaciones correctas para:", profesional.nombre);
+          console.log("🎉 ¡Login exitoso como Profesional!", profesional.nombre);
 
           return {
             id: profesional.id,
@@ -124,7 +115,7 @@ const authOptions = {
           };
         }
 
-        console.log("❌ El correo ingresado no existe ni en 'email' ni en 'correo' dentro de profesionales.");
+        console.log("❌ El correo no existe en ninguna tabla.");
         return null;
       },
     }),
@@ -138,12 +129,6 @@ const authOptions = {
       if (session.user) session.user.role = token.role as string;
       return session;
     },
-    async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
-      if (url.includes("/dashboard-profesional")) {
-        return url;
-      }
-      return `${baseUrl}/admin/profesionales`;
-    },
   },
   pages: {
     signIn: "/admin/login",
@@ -151,23 +136,10 @@ const authOptions = {
   session: {
     strategy: "jwt" as const,
   },
-  useSecureCookies: process.env.NODE_ENV === "production" && !process.env.VERCEL_URL,
-  cookies: {
-    sessionToken: {
-      name: process.env.NODE_ENV === "production" && !process.env.VERCEL_URL
-        ? `__Secure-next-auth.session-token` 
-        : `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: 'lax' as const,
-        path: '/',
-        secure: process.env.NODE_ENV === "production" && !process.env.VERCEL_URL,
-      },
-    },
-  },
-  secret: process.env.NEXTAUTH_SECRET,
+  // 🚀 FORZAR COOKIES INSEGURAS/FLEXIBLES EN VERCEL ESPEJO PARA EVITAR QUE LA PETICIÓN SE CANCELE (POST ---)
+  useSecureCookies: false,
+  secret: process.env.NEXTAUTH_SECRET || "un-secreto-fallback-super-seguro-y-largo-para-la-clinica-123456789",
 };
 
-// 🚀 FORMATO CORRECTO DE EXPORTACIÓN PARA NEXTAUTH V5:
 const { handlers } = NextAuth(authOptions);
 export const { GET, POST } = handlers;
