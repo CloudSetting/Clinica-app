@@ -36,7 +36,7 @@ const authOptions = {
         // =========================================================
         const { data: admin } = await supabaseAdmin
           .from("admins")
-          .select("id, email, password_hash, nombre, rol, activo")
+          .select("*")
           .eq("email", emailInput)
           .maybeSingle();
 
@@ -46,7 +46,10 @@ const authOptions = {
             return null;
           }
 
-          const hashFormateado = (admin.password_hash as string).replace(/^\$2y\$/, "$2a$");
+          const hashDbAdmin = admin.password_hash || admin.password;
+          if (!hashDbAdmin) return null;
+
+          const hashFormateado = (hashDbAdmin as string).replace(/^\$2y\$/, "$2a$");
           const passwordValida = await bcrypt.compare(passwordInput, hashFormateado);
 
           if (!passwordValida) {
@@ -69,17 +72,18 @@ const authOptions = {
         // =========================================================
         console.log("🩺 No es admin, buscando en profesionales...");
         
+        // Seleccionamos todo (*) para evitar errores por omitir columnas personalizadas
         let { data: profesional } = await supabaseAdmin
           .from("profesionales")
-          .select("id, email, correo, password_hash, nombre, apellido, activo")
+          .select("*")
           .eq("email", emailInput)
           .maybeSingle();
 
         if (!profesional) {
-          console.log("🔍 Buscando en la columna 'correo'...");
+          console.log("🔍 No se encontró por 'email', buscando en la columna 'correo'...");
           const { data: profesionalPorCorreo } = await supabaseAdmin
             .from("profesionales")
-            .select("id, email, correo, password_hash, nombre, apellido, activo")
+            .select("*")
             .eq("correo", emailInput)
             .maybeSingle();
           
@@ -92,12 +96,16 @@ const authOptions = {
             return null;
           }
 
-          if (!profesional.password_hash) {
-            console.log("❌ Columna 'password_hash' vacía en Supabase.");
+          // Leemos la columna de contraseña dinámicamente según exista en tu Supabase
+          const hashDb = profesional.password_hash || profesional.password;
+
+          if (!hashDb) {
+            console.log("❌ No se encontró ninguna contraseña encriptada para este profesional en Supabase.");
             return null;
           }
 
-          const hashFormateado = (profesional.password_hash as string).replace(/^\$2y\$/, "$2a$");
+          // Asegurar compatibilidad de hashes ($2y$ de PHP a $2a$ de Node)
+          const hashFormateado = (hashDb as string).replace(/^\$2y\$/, "$2a$");
           const passwordValida = await bcrypt.compare(passwordInput, hashFormateado);
 
           if (!passwordValida) {
@@ -110,8 +118,8 @@ const authOptions = {
           return {
             id: profesional.id,
             email: profesional.email || profesional.correo,
-            name: `${profesional.nombre} ${profesional.apellido || ""}`.trim(),
-            role: "profesional",
+            name: profesional.nombre,
+            role: "profesional", // Asignación de rol clave para el middleware
           };
         }
 
@@ -136,8 +144,7 @@ const authOptions = {
   session: {
     strategy: "jwt" as const,
   },
-  // 🚀 FORZAR COOKIES INSEGURAS/FLEXIBLES EN VERCEL ESPEJO PARA EVITAR QUE LA PETICIÓN SE CANCELE (POST ---)
-  useSecureCookies: false,
+  useSecureCookies: false, // Requerido para compatibilidad en URLs espejo de Vercel
   secret: process.env.NEXTAUTH_SECRET || "un-secreto-fallback-super-seguro-y-largo-para-la-clinica-123456789",
 };
 
