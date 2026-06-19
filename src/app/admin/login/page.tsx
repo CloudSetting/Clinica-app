@@ -14,20 +14,32 @@ export default function AdminLoginPage() {
     setError("");
     setCargando(true);
 
-    // Determinar destino en base al correo ingresado para guiar a NextAuth
-    let destinoOriginal = "/admin/profesionales";
-    if (email.trim().toLowerCase() === "soyiham563@ocuser.com") {
-      destinoOriginal = "/dashboard-profesional";
-    }
-
     try {
-      // 🚀 Redirección nativa por servidor activada en la ruta correcta (/admin/login)
-      await signIn("credentials", {
+      // 🚀 Desactivamos redirect automático para validar el rol en el cliente antes de mover al usuario
+      const resultado = await signIn("credentials", {
         email: email.trim(),
         password,
-        redirect: true, 
-        callbackUrl: destinoOriginal,
+        redirect: false, 
       });
+
+      if (resultado?.error) {
+        console.error("Error devuelto por NextAuth:", resultado.error);
+        setError("Credenciales incorrectas. Revisa tu correo y contraseña.");
+        setCargando(false);
+        return;
+      }
+
+      // 🔍 Si no hay error, le preguntamos a NextAuth qué rol tiene asignado este token
+      const respuestaSesion = await fetch("/api/auth/session");
+      const sesion = await respuestaSesion.json();
+
+      // 🚀 Redirección dinámica basada en roles reales de la base de datos
+      if (sesion?.user?.role === "profesional") {
+        window.location.href = "/dashboard-profesional";
+      } else {
+        window.location.href = "/admin/profesionales";
+      }
+
     } catch (err) {
       console.error("Error en el inicio de sesión:", err);
       setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
