@@ -1,174 +1,82 @@
 "use client";
 
-import React, { useState } from "react"; // 👈 IMPORTANTE: Importamos React para usar FormEvent
+import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { Eye, EyeOff, Lock, Mail, AlertCircle } from "lucide-react";
 
-const MAX_INTENTOS = 5;
-
-export default function AdminLogin() {
+export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [mostrarPassword, setMostrarPassword] = useState(false);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
-  const [intentos, setIntentos] = useState(0);
-  const [bloqueado, setBloqueado] = useState(false);
 
-  // 👈 CORREGIDO: Añadimos el tipo explícito React.FormEvent a 'e' para complacer a TypeScript
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (bloqueado) return;
-
-    setCargando(true);
     setError("");
+    setCargando(true);
+
+    // Determinar destino en base al correo ingresado para guiar a NextAuth
+    let destinoOriginal = "/admin/profesionales";
+    if (email.trim().toLowerCase() === "soyiham563@ocuser.com") {
+      destinoOriginal = "/dashboard-profesional";
+    }
 
     try {
-      const result = await signIn("credentials", {
-        email,
+      // 🚀 Redirección nativa por servidor activada en la ruta correcta (/admin/login)
+      await signIn("credentials", {
+        email: email.trim(),
         password,
-        redirect: false,
+        redirect: true, 
+        callbackUrl: destinoOriginal,
       });
-
-      if (result?.error) {
-        const nuevosIntentos = intentos + 1;
-        setIntentos(nuevosIntentos);
-
-        if (nuevosIntentos >= MAX_INTENTOS) {
-          setBloqueado(true);
-          setError("Demasiados intentos fallidos. Cuenta bloqueada temporalmente.");
-        } else {
-          setError(
-            `Email o contraseña incorrectos. Intentos restantes: ${MAX_INTENTOS - nuevosIntentos}`
-          );
-        }
-        setCargando(false);
-      } else {
-        // Redirección nativa por ventana para evitar congelamientos asincrónicos en producción
-        window.location.href = "/admin/dashboard";
-      }
     } catch (err) {
-      console.error("Error crítico en la autenticación:", err);
-      setError("Ocurrió un problema de comunicación con el servidor.");
+      console.error("Error en el inicio de sesión:", err);
+      setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
       setCargando(false);
     }
   };
 
   return (
-    // 👈 CORREGIDO: Cambiado bg-gradient-to-br por bg-linear-to-br según la sugerencia de Tailwind CSS v4
-    <div className="min-h-screen bg-linear-to-br from-blue-950 to-blue-900 flex items-center justify-center px-4">
-      <div className="bg-white rounded-3xl shadow-xl p-8 w-full max-w-md">
-
-        {/* Logo */}
-        <div className="flex items-center gap-2 justify-center mb-8">
-          <div className="bg-blue-600 text-white font-bold text-sm w-10 h-10 rounded-xl flex items-center justify-center">
-            CM
-          </div>
-          <span className="font-bold text-xl text-gray-900">Centro Médico</span>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-xl border border-gray-100">
+        <div className="text-center">
+          <h2 className="text-3xl font-extrabold text-gray-900">Panel de Control</h2>
+          <p className="mt-2 text-sm text-gray-600">Ingresa tus credenciales de acceso</p>
         </div>
-
-        <h1 className="text-2xl font-bold text-gray-900 text-center mb-1">
-          Panel de administración
-        </h1>
-        <p className="text-gray-500 text-center text-sm mb-8">
-          Acceso restringido solo para administradores
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Correo electrónico
-            </label>
-            <div className="relative">
-              <Mail
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@clinica.cl"
-                required
-                autoComplete="email"
-                disabled={bloqueado}
-                className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:bg-gray-100"
-              />
-            </div>
-          </div>
-
-          {/* Password */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contraseña
-            </label>
-            <div className="relative">
-              <Lock
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                type={mostrarPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                autoComplete="current-password"
-                disabled={bloqueado}
-                className="w-full border border-gray-200 rounded-xl pl-10 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:bg-gray-100"
-              />
-              <button
-                type="button"
-                onClick={() => setMostrarPassword(!mostrarPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
-              >
-                {mostrarPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
-
-          {/* Error */}
+        
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="flex items-start gap-2 text-red-600 bg-red-50 px-4 py-3 rounded-xl text-sm">
-              <AlertCircle size={16} className="shrink-0 mt-0.5" />
-              <p>{error}</p>
+            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center font-medium">
+              {error}
             </div>
           )}
-
-          {/* Barra de intentos */}
-          {intentos > 0 && !bloqueado && (
-            <div className="w-full bg-gray-100 rounded-full h-1.5">
-              <div
-                className="bg-red-500 h-1.5 rounded-full transition-all duration-300"
-                style={{ width: `${(intentos / MAX_INTENTOS) * 100}%` }}
-              />
-            </div>
-          )}
+          <div className="rounded-md shadow-sm space-y-4">
+            <input
+              type="email"
+              required
+              disabled={cargando}
+              className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-50"
+              placeholder="Correo electrónico"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <input
+              type="password"
+              required
+              disabled={cargando}
+              className="appearance-none rounded-lg relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:opacity-50"
+              placeholder="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
 
           <button
             type="submit"
-            disabled={cargando || bloqueado}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all duration-300 hover:scale-[1.02]"
+            disabled={cargando}
+            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all disabled:opacity-70"
           >
-            {bloqueado ? "Cuenta bloqueada" : cargando ? "Ingresando..." : "Ingresar"}
+            {cargando ? "Cargando..." : "Iniciar Sesión"}
           </button>
-
-          {bloqueado && (
-            <button
-              type="button"
-              onClick={() => {
-                setBloqueado(false);
-                setIntentos(0);
-                setError("");
-              }}
-              className="w-full text-blue-600 hover:text-blue-500 text-sm font-medium transition"
-            >
-              Reintentar
-            </button>
-          )}
         </form>
       </div>
     </div>
