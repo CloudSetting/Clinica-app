@@ -5,7 +5,7 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
-  // Obtenemos el token de sesión (busca tanto la cookie segura de prod como la normal de dev)
+  // Obtenemos el token de sesión seguro
   const token = await getToken({ 
     req, 
     secret: process.env.NEXTAUTH_SECRET 
@@ -13,7 +13,7 @@ export async function middleware(req: NextRequest) {
 
   const role = token?.role as string | undefined;
 
-  // 1. Si intenta entrar al panel de profesionales médicos pero NO es profesional (ej: es admin o superadmin)
+  // 1. Protección para el área de profesionales médicos
   if (path.startsWith("/dashboard-profesional")) {
     if (!token) {
       return NextResponse.redirect(new URL("/admin/login", req.url));
@@ -23,19 +23,11 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  // 2. Si intenta entrar a cualquier ruta de /admin
+  // 2. Protección para el área de administración (el matcher ya excluye /admin/login)
   if (path.startsWith("/admin")) {
-    // Excluimos la página de login para evitar bucles infinitos
-    if (path === "/admin/login") {
-      return NextResponse.next();
-    }
-
-    // Si no está logueado, al login
     if (!token) {
       return NextResponse.redirect(new URL("/admin/login", req.url));
     }
-
-    // Si está logueado pero NO es administrador, lo mandamos a su sección médica
     if (role !== "admin" && role !== "superadmin") {
       return NextResponse.redirect(new URL("/dashboard-profesional", req.url));
     }
@@ -44,10 +36,14 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-// Rutas vigiladas por el middleware
+// 🚀 LA CLAVE: Usamos un matcher inteligente que ignora el login, archivos estáticos y la API
 export const config = {
   matcher: [
-    "/admin/:path*",
+    /*
+     * Protege todas las rutas dentro de /admin y /dashboard-profesional,
+     * pero ignora explícitamente la página de login (/admin/login).
+     */
+    "/admin/((?!login).*?)", 
     "/dashboard-profesional/:path*"
   ],
 };
