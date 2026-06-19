@@ -64,7 +64,7 @@ const authOptions = {
           };
         }
 
-// =========================================================
+        // =========================================================
         // 2. INTENTO DE LOGIN COMO PROFESIONAL MÉDICO
         // =========================================================
         console.log("🩺 No es admin, buscando en profesionales...");
@@ -151,15 +151,18 @@ const authOptions = {
   session: {
     strategy: "jwt" as const,
   },
-  useSecureCookies: process.env.NODE_ENV === "production",
+  // 🚀 SOLUCIÓN: Usamos cookies seguras nativas en producción real, pero flexibles en dominios espejo de Vercel
+  useSecureCookies: process.env.NODE_ENV === "production" && !process.env.VERCEL_URL,
   cookies: {
     sessionToken: {
-      name: process.env.NODE_ENV === "production" ? `__Secure-next-auth.session-token` : `next-auth.session-token`,
+      name: process.env.NODE_ENV === "production" && !process.env.VERCEL_URL
+        ? `__Secure-next-auth.session-token` 
+        : `next-auth.session-token`,
       options: {
         httpOnly: true,
         sameSite: 'lax' as const,
         path: '/',
-        secure: process.env.NODE_ENV === "production",
+        secure: process.env.NODE_ENV === "production" && !process.env.VERCEL_URL,
       },
     },
   },
