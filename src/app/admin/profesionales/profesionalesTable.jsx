@@ -4,10 +4,10 @@ import { useState, useMemo } from "react";
 import { Search, Edit, Power, ChevronLeft, ChevronRight, User, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import Image from "next/image";
-import ProfesionalModal from "./ProfesionalModal"; // Asegúrate de que el nombre coincida
+import ProfesionalModal from "./ProfesionalModal";
 
 export default function ProfesionalesTable({ initialData }) {
-  const [profesionales, setProfesionales] = useState(initialData);
+  const [profesionales, setProfesionales] = useState(initialData || []);
   const [busqueda, setBusqueda] = useState("");
   const [paginaActual, setPaginaActual] = useState(1);
   
@@ -17,19 +17,22 @@ export default function ProfesionalesTable({ initialData }) {
 
   const itemsPorPagina = 10;
 
-  // Filtrado de datos
+  // Filtrado de datos blindado contra valores null
   const datosFiltrados = useMemo(() => {
-    return profesionales.filter((p) =>
-      p.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      p.especialidad.toLowerCase().includes(busqueda.toLowerCase())
-    );
+    const texto = busqueda.toLowerCase().trim();
+    return profesionales.filter((p) => {
+      const nombreMatches = p.nombre ? p.nombre.toLowerCase().includes(texto) : false;
+      const espMatches = p.especialidad ? p.especialidad.toLowerCase().includes(texto) : false;
+      const emailMatches = p.email ? p.email.toLowerCase().includes(texto) : false;
+      return nombreMatches || espMatches || emailMatches;
+    });
   }, [busqueda, profesionales]);
 
-  const totalPaginas = Math.ceil(datosFiltrados.length / itemsPorPagina);
+  const totalPaginas = Math.ceil(datosFiltrados.length / itemsPorPagina) || 1;
   const inicio = (paginaActual - 1) * itemsPorPagina;
   const profesionalesPaginados = datosFiltrados.slice(inicio, inicio + itemsPorPagina);
 
-  // Función para refrescar datos tras guardar/editar
+  // Función para refrescar datos tras guardar/editar (Llamado desde el modal)
   const refrescarDatos = async () => {
     const { data } = await supabase
       .from("profesionales")
@@ -40,7 +43,6 @@ export default function ProfesionalesTable({ initialData }) {
 
   const toggleEstado = async (id, estadoActual) => {
     const nuevoEstado = !estadoActual;
-    // Usamos el cliente 'supabase' (público) para componentes cliente
     const { error } = await supabase
       .from("profesionales")
       .update({ activo: nuevoEstado })
@@ -71,7 +73,7 @@ export default function ProfesionalesTable({ initialData }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
-            placeholder="Buscar por nombre o especialidad..."
+            placeholder="Buscar por nombre, especialidad o email..."
             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={busqueda}
             onChange={(e) => { setBusqueda(e.target.value); setPaginaActual(1); }}
@@ -101,56 +103,64 @@ export default function ProfesionalesTable({ initialData }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {profesionalesPaginados.map((pro) => (
-              <tr key={pro.id} className="hover:bg-gray-50 transition-colors">
-                <td className="p-4">
-                  {pro.foto_url ? (
-                    <div className="relative w-10 h-10">
-                      <Image 
-                        src={pro.foto_url} 
-                        alt={pro.nombre} 
-                        fill
-                        sizes="40px"
-                        className="rounded-full object-cover"
-                        unoptimized 
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                      <User size={20} />
-                    </div>
-                  )}
-                </td>
-                <td className="p-4 text-sm font-medium text-gray-900">{pro.nombre}</td>
-                <td className="p-4 text-sm text-gray-600">
-                  <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
-                    {pro.especialidad}
-                  </span>
-                </td>
-                <td className="p-4 text-sm text-gray-500">{pro.email}</td>
-                <td className="p-4">
-                  <span className={`px-2 py-1 rounded-lg text-xs font-bold ${pro.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {pro.activo ? "ACTIVO" : "INACTIVO"}
-                  </span>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center justify-center gap-2">
-                    <button 
-                      onClick={() => abrirModalEditar(pro)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                    >
-                      <Edit size={18} />
-                    </button>
-                    <button 
-                      onClick={() => toggleEstado(pro.id, pro.activo)}
-                      className={`p-2 rounded-lg transition ${pro.activo ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
-                    >
-                      <Power size={18} />
-                    </button>
-                  </div>
+            {profesionalesPaginados.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="p-8 text-center text-sm text-gray-400">
+                  No se encontraron profesionales registrados o que coincidan con la búsqueda.
                 </td>
               </tr>
-            ))}
+            ) : (
+              profesionalesPaginados.map((pro) => (
+                <tr key={pro.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="p-4">
+                    {pro.foto_url ? (
+                      <div className="relative w-10 h-10">
+                        <Image 
+                          src={pro.foto_url} 
+                          alt={pro.nombre || "Profesional"} 
+                          fill
+                          sizes="40px"
+                          className="rounded-full object-cover"
+                          unoptimized 
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                        <User size={20} />
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-4 text-sm font-medium text-gray-900">{pro.nombre}</td>
+                  <td className="p-4 text-sm text-gray-600">
+                    <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                      {pro.especialidad || "Sin Especialidad"}
+                    </span>
+                  </td>
+                  <td className="p-4 text-sm text-gray-500">{pro.email || pro.correo}</td>
+                  <td className="p-4">
+                    <span className={`px-2 py-1 rounded-lg text-xs font-bold ${pro.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {pro.activo ? "ACTIVO" : "INACTIVO"}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <button 
+                        onClick={() => abrirModalEditar(pro)}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button 
+                        onClick={() => toggleEstado(pro.id, pro.activo)}
+                        className={`p-2 rounded-lg transition ${pro.activo ? 'text-gray-400 hover:text-red-600 hover:bg-red-50' : 'text-gray-400 hover:text-green-600 hover:bg-green-50'}`}
+                      >
+                        <Power size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -158,7 +168,7 @@ export default function ProfesionalesTable({ initialData }) {
       {/* Paginación */}
       <div className="flex items-center justify-between px-2">
         <p className="text-sm text-gray-500">
-          Mostrando {inicio + 1} a {Math.min(inicio + itemsPorPagina, datosFiltrados.length)} de {datosFiltrados.length}
+          Mostrando {datosFiltrados.length === 0 ? 0 : inicio + 1} a {Math.min(inicio + itemsPorPagina, datosFiltrados.length)} de {datosFiltrados.length}
         </p>
         <div className="flex gap-2">
           <button
@@ -178,7 +188,7 @@ export default function ProfesionalesTable({ initialData }) {
         </div>
       </div>
 
-      {/* Modal para Agregar/Editar */}
+      {/* Modal Conectado con Flujo de Actualización */}
       <ProfesionalModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
