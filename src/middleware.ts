@@ -5,45 +5,30 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
-  // Obtenemos el token de sesión seguro
+  // 1. Permitir siempre el acceso al login y los endpoints de la API de autenticación
+  if (path === "/admin/login" || path.startsWith("/api/auth")) {
+    return NextResponse.next();
+  }
+
+  // 2. Extraer el token de sesión
   const token = await getToken({ 
     req, 
-    secret: process.env.NEXTAUTH_SECRET 
+    secret: process.env.NEXTAUTH_SECRET || "un-secreto-fallback-super-seguro-y-largo-para-la-clinica-123456789" 
   });
 
-  const role = token?.role as string | undefined;
-
-  // 1. Protección para el área de profesionales médicos
-  if (path.startsWith("/dashboard-profesional")) {
-    if (!token) {
-      return NextResponse.redirect(new URL("/admin/login", req.url));
-    }
-    if (role !== "profesional") {
-      return NextResponse.redirect(new URL("/admin/dashboard", req.url));
-    }
+  // 3. Si el usuario no tiene una sesión activa y quiere entrar a una ruta privada, mandarlo al login
+  if (!token) {
+    return NextResponse.redirect(new URL("/admin/login", req.url));
   }
 
-  // 2. Protección para el área de administración (el matcher ya excluye /admin/login)
-  if (path.startsWith("/admin")) {
-    if (!token) {
-      return NextResponse.redirect(new URL("/admin/login", req.url));
-    }
-    if (role !== "admin" && role !== "superadmin") {
-      return NextResponse.redirect(new URL("/dashboard-profesional", req.url));
-    }
-  }
-
+  // Dejar pasar si la sesión existe. Los roles los manejaremos directamente en el Layout o las páginas.
   return NextResponse.next();
 }
 
-// 🚀 LA CLAVE: Usamos un matcher inteligente que ignora el login, archivos estáticos y la API
+// Proteger todas las rutas de administración y del profesional médico
 export const config = {
   matcher: [
-    /*
-     * Protege todas las rutas dentro de /admin y /dashboard-profesional,
-     * pero ignora explícitamente la página de login (/admin/login).
-     */
-    "/admin/((?!login).*?)", 
+    "/admin/:path*",
     "/dashboard-profesional/:path*"
   ],
 };
