@@ -151,7 +151,6 @@ const authOptions = {
   session: {
     strategy: "jwt" as const,
   },
-  // 🚀 SOLUCIÓN: Usamos cookies seguras nativas en producción real, pero flexibles en dominios espejo de Vercel
   useSecureCookies: process.env.NODE_ENV === "production" && !process.env.VERCEL_URL,
   cookies: {
     sessionToken: {
@@ -169,5 +168,6 @@ const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-const authResult = NextAuth(authOptions);
-export const { GET, POST } = authResult.handlers;
+// 🚀 FORMATO CORRECTO DE EXPORTACIÓN PARA NEXTAUTH V5:
+const { handlers } = NextAuth(authOptions);
+export const { GET, POST } = handlers;
