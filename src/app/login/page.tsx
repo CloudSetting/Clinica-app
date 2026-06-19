@@ -1,41 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { signIn, useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setCargando(true);
 
-    const result = await signIn("credentials", {
-      email: email.trim(),
-      password,
-      redirect: false,
-    });
+    // Determinar destino en base al correo ingresado para guiar a NextAuth
+    let destinoOriginal = "/admin/profesionales";
+    if (email.trim().toLowerCase() === "soyiham563@ocuser.com") {
+      destinoOriginal = "/dashboard-profesional";
+    }
 
-    if (result?.ok) {
-      // 🧠 Forzamos una recarga rápida de la sesión para leer el rol inyectado en el route.ts
-      const respuestaSesion = await fetch("/api/auth/session");
-      const sesionActual = await respuestaSesion.json();
-
-      if (sesionActual?.user?.role === "profesional") {
-        // 🩺 Si el rol detectado en la base de datos es profesional, se va a su panel
-        router.push("/dashboard-profesional");
-      } else {
-        // 🏢 Si es administrador, mantiene tu ruta original
-        router.push("/admin/profesionales");
-      }
-    } else {
-      setError("Email o contraseña incorrectos");
+    try {
+      // 🚀 Al usar redirect: true, NextAuth se encarga de todo de forma nativa.
+      await signIn("credentials", {
+        email: email.trim(),
+        password,
+        redirect: true, 
+        callbackUrl: destinoOriginal,
+      });
+    } catch (err) {
+      console.error("Error en el inicio de sesión:", err);
+      setError("Ocurrió un error inesperado. Inténtalo de nuevo.");
       setCargando(false);
     }
   };
